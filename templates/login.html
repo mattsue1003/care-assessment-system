@@ -9,6 +9,8 @@
   <label class="f">帳號</label><input type="text" name="username" autofocus autocomplete="username">
   <label class="f">密碼</label><input type="password" name="password" autocomplete="current-password">
   <button class="btn pri">登入</button>
-  <p class="muted small" style="text-align:center;margin:14px 0 0">資料只存在本機，不會上傳雲端</p>
+  {% if demo %}<p class="small" style="text-align:center;margin:14px 0 0;background:#fff4d6;padding:8px;border-radius:8px">
+    <b>試用版</b>　帳號 <b>1111</b>　密碼 <b>1111</b><br>裡面的個案都是假名，請放心操作</p>
+  {% else %}<p class="muted small" style="text-align:center;margin:14px 0 0">資料只存在本機，不會上傳雲端</p>{% endif %}
 </form>
 </body></html>

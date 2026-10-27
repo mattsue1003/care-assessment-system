@@ -19,6 +19,13 @@
 - 示範資料在 `demo/demo.db`：45 位個案皆為**假名**，案號重編、出生日期與評估日期隨機偏移，電話地址等全部刪除
 - 示範版會複製一份到 `data/demo_work.db` 來操作；要還原：`./啟動示範版.command --reset`
 
+## 給單位試用：公開網址
+
+`開啟公開試用.command`（macOS）會在本機跑示範版，並用 Cloudflare 通道產生 `https://xxxx.trycloudflare.com` 公開網址。
+需先把 Cloudflare 官方 [cloudflared](https://github.com/cloudflare/cloudflared/releases) 放到 `tools/cloudflared`。
+電腦要保持開機（程式會防止睡眠）；關掉視窗網址就失效，重開會換新網址。
+示範版（`CARE_DEMO=1`）會關閉名冊匯入與帳號修改，並有「💬 意見回饋」可收集試用意見、匯出 Excel。
+
 ## 功能
 
 | 功能 | 說明 |

@@ -18,6 +18,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, "data")
 DB_PATH = os.environ.get("CARE_DB") or os.path.join(DATA_DIR, "care.db")
 os.makedirs(DATA_DIR, exist_ok=True)
+DEMO = os.environ.get("CARE_DEMO") == "1"  # 示範版：關閉名冊匯入與帳號修改（避免真實資料進入公開網站）
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = None  # set in init
@@ -42,6 +43,8 @@ CREATE TABLE IF NOT EXISTS goals (id INTEGER PRIMARY KEY, client_id INTEGER, dom
   created TEXT, updated TEXT);
 CREATE TABLE IF NOT EXISTS goal_reviews (id INTEGER PRIMARY KEY, goal_id INTEGER, date TEXT, progress TEXT,
   note TEXT, reviewer TEXT, created TEXT);
+CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, ts TEXT, name TEXT, role TEXT, page TEXT,
+  kind TEXT, content TEXT, status TEXT DEFAULT '未處理', reply TEXT);
 CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, ts TEXT, user TEXT, action TEXT, detail TEXT);
 """
 
@@ -258,8 +261,9 @@ def login_required(f):
 @app.context_processor
 def _ctx():
     if not session.get("uid"):
-        return {"center": DEFAULT_SETTINGS["center_name"]}
-    return {"center": setting("center_name"), "me": {"name": session.get("name"), "title": session.get("title")}}
+        return {"center": setting("center_name"), "demo": DEMO}
+    return {"center": setting("center_name"), "demo": DEMO,
+            "me": {"name": session.get("name"), "title": session.get("title")}}
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -875,6 +879,49 @@ def export_pack():
     return send_file(buf, as_attachment=True, download_name=root + ".zip")
 
 
+# ================================================================== 意見回饋
+FB_KINDS = ["希望增加", "希望刪減", "操作不順／看不懂", "錯誤（壞掉）", "其他"]
+
+
+@app.route("/feedback", methods=["GET", "POST"])
+@login_required
+def feedback():
+    if request.method == "POST":
+        f = request.form
+        if f.get("content", "").strip():
+            db().execute("INSERT INTO feedback (ts,name,role,page,kind,content) VALUES (?,?,?,?,?,?)",
+                         (now(), f.get("name", "").strip()[:30], f.get("role", "")[:20], f.get("page", "")[:60],
+                          f.get("kind", ""), f["content"].strip()[:2000]))
+            db().commit()
+            flash("謝謝您的意見！已送出", "ok")
+        return redirect(url_for("feedback"))
+    rows = db().execute("SELECT * FROM feedback ORDER BY id DESC").fetchall()
+    return render_template("feedback.html", rows=rows, kinds=FB_KINDS, page=request.args.get("page", ""))
+
+
+@app.route("/feedback/<int:xid>/status", methods=["POST"])
+@login_required
+def feedback_status(xid):
+    db().execute("UPDATE feedback SET status=?, reply=? WHERE id=?",
+                 (request.form.get("status", "未處理"), request.form.get("reply", "").strip(), xid))
+    db().commit()
+    return redirect(url_for("feedback"))
+
+
+@app.route("/feedback.xlsx")
+@login_required
+def feedback_xlsx():
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active; ws.title = "意見回饋"
+    ws.append(["時間", "姓名", "職稱", "頁面", "類型", "內容", "處理狀態", "回覆"])
+    for r in db().execute("SELECT * FROM feedback ORDER BY id"):
+        ws.append([r["ts"], r["name"], r["role"], r["page"], r["kind"], r["content"], r["status"], r["reply"]])
+    for col, w in zip("ABCDEFGH", (18, 10, 10, 16, 14, 60, 10, 30)):
+        ws.column_dimensions[col].width = w
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=f"試用意見回饋_{roc(date.today(), '')}.xlsx")
+
+
 # ================================================================== 系統設定
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
@@ -893,6 +940,9 @@ def settings():
 @app.route("/settings/user", methods=["POST"])
 @login_required
 def user_save():
+    if DEMO:
+        flash("示範版不開放修改帳號", "err")
+        return redirect(url_for("settings"))
     f = request.form
     if session.get("role") != "admin" and str(session.get("uid")) != f.get("id"):
         abort(403)
@@ -915,6 +965,9 @@ def user_save():
 @app.route("/settings/import", methods=["POST"])
 @login_required
 def import_roster():
+    if DEMO:
+        flash("示範版不開放匯入名冊（避免真實資料進入示範網站）", "err")
+        return redirect(url_for("settings"))
     import importer
     fs = request.files.get("file")
     path = None

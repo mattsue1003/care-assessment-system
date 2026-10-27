@@ -12,7 +12,9 @@
 <div class="top">
   <div class="logo"><i>福</i>照護評估系統</div>
   <span class="small">單位：{{ center }}</span>
+  {% if demo %}<span class="b warn" style="background:#ffe9a8">示範版｜資料皆為假名</span>{% endif %}
   <span class="sp"></span>
+  <a class="btn sm acc" href="{{ url_for('feedback', page=request.path) }}" style="color:#fff">💬 意見回饋</a>
   <span class="small">用戶：{{ me.name }}{% if me.title %}（{{ me.title }}）{% endif %}</span>
   <a class="small" href="{{ url_for('logout') }}">登出</a>
 </div>
@@ -30,6 +32,7 @@
   <div class="grp">評鑑與報表</div>
   <a href="{{ url_for('reports') }}" class="{{ 'on' if ep=='reports' }}">📦 <span>評鑑佐證／匯出</span></a>
   <div class="grp">系統</div>
+  <a href="{{ url_for('feedback') }}" class="{{ 'on' if ep=='feedback' }}">💬 <span>試用意見回饋</span></a>
   <a href="{{ url_for('settings') }}" class="{{ 'on' if ep=='settings' }}">⚙️ <span>設定／匯入／備份</span></a>
 </nav>
 <main>

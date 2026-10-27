@@ -9,4 +9,4 @@ mkdir -p data
 if [ "$1" == "--reset" ] || [ ! -f data/demo_work.db ]; then cp demo/demo.db data/demo_work.db; echo "已載入全新示範資料"; fi
 (sleep 2; open "http://127.0.0.1:5051") &
 echo "示範版啟動中（http://127.0.0.1:5051）…帳號 1111／密碼 1111。要還原示範資料：在終端機執行 ./啟動示範版.command --reset"
-CARE_DB=data/demo_work.db .venv/bin/python app.py --port 5051
+CARE_DEMO=1 CARE_DB=data/demo_work.db .venv/bin/python app.py --port 5051

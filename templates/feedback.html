@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>💬 試用意見回饋</h1>
+<div class="muted">哪裡想增加、想刪掉、看不懂或壞掉，都歡迎寫下來（每則都會看）</div></div><span class="sp"></span>
+<a class="btn" href="{{ url_for('feedback_xlsx') }}">⬇ 下載全部意見（Excel）</a></div>
+<form class="card" method="post">
+  <div class="grid g4">
+    <div><label class="f">您的姓名（可不填）</label><input type="text" name="name" style="width:100%"></div>
+    <div><label class="f">職稱</label><select name="role" style="width:100%">{% for s in ['','職能治療師','物理治療師','護理師','社工','照服員','主管','行政','其他'] %}<option>{{ s }}</option>{% endfor %}</select></div>
+    <div><label class="f">類型</label><select name="kind" style="width:100%">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select></div>
+    <div><label class="f">哪個畫面</label><input type="text" name="page" value="{{ page }}" style="width:100%" placeholder="例：六力評估"></div>
+  </div>
+  <label class="f" style="margin-top:10px">意見內容</label>
+  <textarea name="content" required placeholder="例：D61 希望多一個「吞嚥」欄位；六力的聽力題目希望可以選左右耳都聽不到…"></textarea>
+  <div style="margin-top:10px"><button class="btn pri">送出意見</button></div>
+</form>
+<div class="card"><h2>已收到的意見（{{ rows|length }}）</h2>
+<div class="tbl-wrap"><table class="t">
+<tr><th>時間</th><th>姓名／職稱</th><th>類型</th><th>畫面</th><th>內容</th><th>處理</th></tr>
+{% for r in rows %}<tr><td class="small">{{ r.ts[:16] }}</td><td>{{ r.name or '匿名' }}<div class="small muted">{{ r.role }}</div></td>
+  <td><span class="b {{ 'warn' if r.kind=='希望增加' else ('bad' if '錯誤' in r.kind else '') }}">{{ r.kind }}</span></td><td class="small">{{ r.page }}</td>
+  <td style="white-space:pre-wrap">{{ r.content }}{% if r.reply %}<div class="small" style="color:var(--brand);margin-top:4px">↳ 回覆：{{ r.reply }}</div>{% endif %}</td>
+  <td><form method="post" action="{{ url_for('feedback_status', xid=r.id) }}" class="fr">
+    <select name="status" style="font-size:13px">{% for s in ['未處理','已採納','研議中','不採用'] %}<option {{ 'selected' if s==r.status }}>{{ s }}</option>{% endfor %}</select>
+    <input type="text" name="reply" value="{{ r.reply or '' }}" placeholder="回覆" style="width:120px;font-size:13px"><button class="btn sm">更新</button></form></td></tr>
+{% else %}<tr><td colspan="6" class="empty">還沒有意見</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}
