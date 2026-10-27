@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% macro field(f, data, fam) -%}
+  {% set v = data.get(f.key) %}
+  <div class="fld wide"><div class="lb">{{ f.label }}</div><div>
+  {% if f.type == 'multi' %}<div class="pills">{% for o in f.options %}<label class="pill"><input type="checkbox" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if o in (v or []) }}><span>{{ o }}</span></label>{% endfor %}</div>
+  {% elif f.type == 'radio' %}<div class="pills">{% for o in f.options %}<label class="pill"><input type="radio" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v==o }}><span>{{ o }}</span></label>{% endfor %}</div>
+  {% elif f.type == 'month' %}<input type="month" name="{{ f.key }}" value="{{ v or today()[:7] }}">
+  {% elif f.type == 'time' %}<input type="time" name="{{ f.key }}" value="{{ v or '' }}">
+  {% elif f.type == 'family' %}<input type="text" name="{{ f.key }}" value="{{ v or '' }}" list="famlist" placeholder="姓名／關係" style="width:100%"><datalist id="famlist">{% for x in fam %}<option>{{ x }}</option>{% endfor %}</datalist>
+    {% if fam %}<div class="tpl" data-for="{{ f.key }}" data-replace="1">{% for x in fam %}<button type="button" class="tchip">{{ x }}</button>{% endfor %}</div>{% endif %}
+  {% elif f.type == 'textarea' %}{% if f.auto %}<div class="btns" style="margin-bottom:6px"><button type="button" class="btn sm acc" onclick="autoGen('{{ f.key }}')">✨ 自動產生</button></div>{% endif %}
+    <textarea name="{{ f.key }}" id="ta_{{ f.key }}" style="min-height:{{ 160 if f.auto else 80 }}px">{{ v or '' }}</textarea>
+    {% if f.templates %}<div class="tpl" data-for="{{ f.key }}">{% for t in f.templates %}<button type="button" class="tchip">{{ t }}</button>{% endfor %}</div>{% endif %}
+  {% else %}<input type="text" name="{{ f.key }}" value="{{ v or '' }}" style="width:100%">{% endif %}
+  </div></div>
+{%- endmacro %}
+{% block body %}
+<div class="pagehead"><div><h1>{{ '群組電訪（一次通知多位家屬）' if batch else spec.title }}{{ '（編輯）' if r else '' }}</h1>
+<div class="muted">{{ '勾選要通知的個案，內容寫一次，系統會為每位個案各建一筆電訪紀錄' if batch else '常用內容點一下就帶入；聯絡家屬從過去紀錄自動帶出' }}</div></div>
+<span class="sp"></span>{% if mod=='PC' and not batch %}<a class="btn" href="{{ url_for('pc_batch') }}">群組電訪</a>{% endif %}</div>
+<form method="post" id="f" action="{{ url_for('pc_batch') if batch else (url_for('simple_save', mod=mod, rid=r.id) if r else url_for('simple_save', mod=mod)) }}">
+<div class="formbar"><div class="fr">
+  {% if not batch %}<div><label class="f">個案</label><select name="client_id" required {% if not r %}onchange="location.href='?client='+this.value"{% endif %} style="min-width:200px">
+    <option value="">— 請選擇 —</option>{% for x in cs %}<option value="{{ x.id }}" {{ 'selected' if c and x.id==c.id }}>{{ x.label }}</option>{% endfor %}</select></div>{% endif %}
+  <div><label class="f">日期</label><input type="date" name="date" value="{{ day }}" required></div>
+  <span style="flex:1"></span><div class="btns hide-m"><button class="btn pri">💾 儲存</button></div></div></div>
+{% if c or batch %}<button class="fab-save" type="submit">💾 儲存</button>
+{% if batch %}<div class="card"><h2>通知對象 <label class="small" style="font-weight:400"><input type="checkbox" onclick="document.querySelectorAll('[name=clients]').forEach(x=>x.checked=this.checked)"> 全選</label></h2>
+  <div class="grid g3">{% for x in cs %}<div style="display:flex;gap:6px;align-items:center"><label><input type="checkbox" name="clients" value="{{ x.id }}"> {{ x.name }}</label>
+    <input type="text" name="family_{{ x.id }}" value="{{ x.fam[0] if x.fam else '' }}" placeholder="家屬" style="flex:1;font-size:13px;padding:4px 6px;min-height:0"></div>{% endfor %}</div></div>{% endif %}
+<div class="card">{% for f in spec.fields if not (batch and f.type == 'family') %}{{ field(f, data, fam) }}{% endfor %}
+  <div class="btns" style="margin-top:12px"><button class="btn pri">💾 儲存</button></div></div>
+{% else %}<div class="card empty">請先選擇個案</div>{% endif %}
+</form>
+{% endblock %}
+{% block script %}
+<script>
+async function autoGen(k) { const t = document.getElementById('ta_' + k); if (t.value.trim() && !confirm('用自動產生的內容取代？')) return;
+  const r = await fetch('{{ url_for("api_auto", mod=mod) }}', {method: 'POST', body: new FormData(document.getElementById('f'))}); t.value = (await r.json()).desc; }
+document.addEventListener('click', e => { const b = e.target.closest('.tchip'); if (!b) return; const inp = document.querySelector(`[name="${b.parentElement.dataset.for}"]`); if (!inp) return;
+  const t = b.textContent.trim(); if (b.parentElement.dataset.replace) inp.value = t; else if (!inp.value.includes(t)) inp.value = inp.value ? inp.value + (inp.tagName === 'TEXTAREA' ? '' : '；') + t : t; });
+</script>
+{% endblock %}

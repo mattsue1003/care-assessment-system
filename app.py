@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS goal_reviews (id INTEGER PRIMARY KEY, goal_id INTEGER
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, ts TEXT, name TEXT, role TEXT, page TEXT,
   kind TEXT, content TEXT, status TEXT DEFAULT '未處理', reply TEXT);
 CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, ts TEXT, user TEXT, action TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY, client_id INTEGER, module TEXT, date TEXT, staff TEXT,
+  data TEXT, source_id TEXT, created TEXT);
+CREATE INDEX IF NOT EXISTS ix_records ON records(module, client_id, date);
 """
 
 DEFAULT_PASSWORD = "1111"  # 預設帳號 1111／密碼 1111，登入後請到「設定」修改
@@ -225,7 +228,7 @@ def client_goals(cid):
 
 def due_info(cid, months=None):
     months = months or int(setting("reeval_months") or 6)
-    rows = db().execute("SELECT type,date,next_due FROM assessments WHERE client_id=? ORDER BY date DESC", (cid,)).fetchall()
+    rows = db().execute("SELECT type,date,next_due FROM assessments WHERE client_id=? AND type IN ('D61','ICOPE','D61_HIST','ICOPE_HIST') ORDER BY date DESC", (cid,)).fetchall()
     if not rows:
         return {"last": "", "next": "", "status": "未評估", "last_d61": "", "last_icope": ""}
     last = rows[0]
@@ -235,6 +238,16 @@ def due_info(cid, months=None):
     ld = next((r["date"] for r in rows if r["type"] in ("D61", "D61_HIST")), "")
     li = next((r["date"] for r in rows if r["type"] in ("ICOPE", "ICOPE_HIST")), "")
     return {"last": last["date"], "next": nxt.isoformat(), "status": st, "last_d61": ld, "last_icope": li}
+
+
+def cs_with(c):
+    """表單用個案清單：在案個案＋目前選到的個案（即使已結案）"""
+    cs = active_clients()
+    if c and not any(x["id"] == c["id"] for x in cs):
+        x = dict(c)
+        x["label"] = f"{c['label']}（{c.get('status', '')}）"
+        cs.insert(0, x)
+    return cs
 
 
 def active_clients(status="在案"):
@@ -382,7 +395,7 @@ def client_view(cid):
     d61s = [a for a in allas if a["type"] == "D61"]
     icopes = [a for a in allas if a["type"] == "ICOPE"]
     changes = S.compare_d61(d61s[1]["data"], d61s[0]["data"]) if len(d61s) > 1 else []
-    return render_template("client.html", c=c, allas=allas, d61s=d61s, icopes=icopes, changes=changes,
+    return render_template("client.html", c=c, allas=allas, d61s=d61s, icopes=icopes, changes=changes, recsum=client_records_summary(cid),
                            aids=client_aids(cid), goals=client_goals(cid), due=due_info(cid),
                            trend=icope_trend(icopes), d61trend=d61_trend(d61s))
 
@@ -492,7 +505,7 @@ def assess_edit(typ, aid=None):
     }
     ic_latest = client_assess(cid, ["ICOPE"])[:1] if c else []
     tpl = "d61_form.html" if typ == "D61" else "icope_form.html"
-    return render_template(tpl, a=a, c=c, data=data, prev=prev, src=src, m=defaults, cs=active_clients(),
+    return render_template(tpl, a=a, c=c, data=data, prev=prev, src=src, m=defaults, cs=cs_with(c),
                            aids=client_aids(cid) if c else [], ic_latest=ic_latest[0] if ic_latest else None,
                            judge=S.icope_auto(data) if typ == "ICOPE" else None)
 
@@ -878,6 +891,336 @@ def export_pack():
     log("匯出評鑑佐證包", root)
     db().commit()
     return send_file(buf, as_attachment=True, download_name=root + ".zip")
+
+
+# ================================================================== 跨專業紀錄（照服、護理、營養、社工…）
+import modules as M  # noqa: E402
+
+MODULE_NAMES = {
+    "DAILY": "今日照顧紀錄（生命徵象＋如廁＋照顧）", "MNA": "營養評估（MNA）", "HV": "社工家訪紀錄", "PC": "電訪紀錄", "IR": "異常事件紀錄", "MS": "月照顧摘要", "CL": "結案紀錄", "EA": "環境適應評估",
+    "D71": "生命徵象（care99）", "D72": "如廁紀錄（care99）", "D73": "用藥紀錄", "D74": "活動訓練", "D75": "照顧紀錄（care99）",
+    "D7": "綜合照顧紀錄", "D60": "綜合評估", "D60a": "營養評估（care99）", "D63": "環境適應評估", "D21": "家訪紀錄", "D22": "電訪紀錄",
+    "D20": "衛福計畫簡述", "D21b": "照顧計畫", "D23": "異常服務紀錄", "D25": "其他日常", "D26": "暫停紀錄", "D27": "評估問卷",
+    "D29": "結案紀錄", "D32": "督導紀錄", "B31": "公費評估", "B32": "自費申請", "B2": "使用者資料", "B2c": "健康項目", "B6": "通訊錄",
+}
+
+
+def rec_dict(r):
+    d = dict(r)
+    d["data"] = json.loads(d["data"] or "{}")
+    return d
+
+
+def usual_daily(cid):
+    """個案平常的照顧紀錄值（近 20 筆最常見）→ 作為今日預設"""
+    import collections
+    rows = [json.loads(r["data"]) for r in db().execute(
+        "SELECT data FROM records WHERE module='DAILY' AND client_id=? ORDER BY date DESC LIMIT 20", (cid,))]
+    out = dict(M.DAILY_DEFAULT)
+    for k in M.DAILY_DEFAULT:
+        c = collections.Counter(r.get(k) for r in rows if r.get(k) and r.get(k) != "未記錄")
+        if c:
+            out[k] = c.most_common(1)[0][0]
+    return out
+
+
+@app.route("/daily", methods=["GET", "POST"])
+@login_required
+def daily():
+    day = iso(request.values.get("date")) or date.today().isoformat()
+    cs = active_clients()
+    if request.method == "POST":
+        n = 0
+        for c in cs:
+            pre = f"c{c['id']}_"
+            if not request.form.get(pre + "present"):
+                d = {"absent": "1", "note": request.form.get(pre + "note", "").strip()}
+            else:
+                d = {k: request.form.get(pre + k, "").strip() for k in M.DAILY_KEYS}
+            d = {k: v for k, v in d.items() if v}
+            ex = db().execute("SELECT id FROM records WHERE module='DAILY' AND client_id=? AND date=?", (c["id"], day)).fetchone()
+            if ex:
+                db().execute("UPDATE records SET data=?, staff=? WHERE id=?", (json.dumps(d, ensure_ascii=False), session.get("name"), ex["id"]))
+            else:
+                db().execute("INSERT INTO records (client_id,module,date,staff,data,created) VALUES (?,?,?,?,?,?)",
+                             (c["id"], "DAILY", day, session.get("name"), json.dumps(d, ensure_ascii=False), now()))
+            n += 1
+        log("今日照顧紀錄", f"{day} {n} 人")
+        db().commit()
+        flash(f"{roc(day)} 照顧紀錄已儲存（{n} 人）", "ok")
+        return redirect(url_for("daily", date=day))
+    rows = []
+    for c in cs:
+        ex = db().execute("SELECT * FROM records WHERE module='DAILY' AND client_id=? AND date=?", (c["id"], day)).fetchone()
+        usual = usual_daily(c["id"])
+        d = json.loads(ex["data"]) if ex else dict(usual)
+        rows.append({"c": c, "d": d, "usual": usual, "saved": bool(ex), "alerts": M.daily_alerts(d) if ex else []})
+    saved = sum(1 for r in rows if r["saved"])
+    return render_template("daily.html", rows=rows, day=day, M=M, saved=saved,
+                           prev=(to_date(day) - timedelta(days=1)).isoformat(), next=(to_date(day) + timedelta(days=1)).isoformat())
+
+
+@app.route("/records")
+@login_required
+def records_index():
+    mods = [dict(r) for r in db().execute("SELECT module, COUNT(*) n, MIN(date) first, MAX(date) last FROM records GROUP BY module ORDER BY module")]
+    for m in mods:
+        m["name"] = MODULE_NAMES.get(m["module"], m["module"])
+    return render_template("records_index.html", mods=mods)
+
+
+@app.route("/records/<module>")
+@login_required
+def records_list(module):
+    cid = request.args.get("client", type=int)
+    sql = "SELECT r.*, c.name, c.case_no FROM records r LEFT JOIN clients c ON c.id=r.client_id WHERE r.module=?"
+    args = [module]
+    if cid:
+        sql += " AND r.client_id=?"; args.append(cid)
+    f, t = iso(request.args.get("from")), iso(request.args.get("to"))
+    if f:
+        sql += " AND r.date>=?"; args.append(f)
+    if t:
+        sql += " AND r.date<=?"; args.append(t)
+    rows = [rec_dict(r) for r in db().execute(sql + " ORDER BY r.date DESC, r.id DESC LIMIT 500", args)]
+    for r in rows:
+        if module == "MNA":
+            r["score"] = M.mna_score(r["data"])
+        if module == "DAILY":
+            r["alerts"] = M.daily_alerts(r["data"])
+    cols = []
+    if rows and module not in ("DAILY", "MNA"):
+        for r in rows[:50]:
+            for k in r["data"]:
+                if k != "_detail" and k not in cols and k not in ("編輯/刪除", "檢視", "功能", "建檔", "異動", "使用者", "姓名", "評估對象", "訪視對象"):
+                    cols.append(k)
+    return render_template("records.html", module=module, title=MODULE_NAMES.get(module, module), rows=rows, cols=cols[:12],
+                           client=get_client(cid) if cid else None, M=M, f=f, t=t)
+
+
+@app.route("/records/<module>/<int:rid>")
+@login_required
+def record_view(module, rid):
+    r = db().execute("SELECT r.*, c.name, c.case_no FROM records r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?", (rid,)).fetchone()
+    if not r:
+        abort(404)
+    r = rec_dict(r)
+    return render_template("record_view.html", r=r, module=module, title=MODULE_NAMES.get(module, module), M=M,
+                           score=M.mna_score(r["data"]) if module == "MNA" else None)
+
+
+@app.route("/nutri/new")
+@app.route("/nutri/<int:rid>/edit")
+@login_required
+def nutri_form(rid=None):
+    r = rec_dict(db().execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()) if rid else None
+    cid = int(request.args.get("client") or (r and r["client_id"]) or 0)
+    c = get_client(cid) if cid else None
+    data = r["data"] if r else {}
+    if not r and c:  # 帶入上次身高
+        last = db().execute("SELECT data FROM records WHERE module='MNA' AND client_id=? ORDER BY date DESC LIMIT 1", (cid,)).fetchone()
+        if last:
+            ld = json.loads(last["data"])
+            data = {k: ld[k] for k in ("height", "texture", "p_staple", "p_protein", "p_veg", "water") if ld.get(k)}
+    return render_template("nutri_form.html", r=r, c=c, data=data, M=M, cs=cs_with(c),
+                           day=r["date"] if r else date.today().isoformat())
+
+
+@app.route("/nutri/save", methods=["POST"])
+@app.route("/nutri/<int:rid>/save", methods=["POST"])
+@login_required
+def nutri_save(rid=None):
+    f = request.form
+    cid = int(f.get("client_id") or 0)
+    if not cid:
+        flash("請選擇評估對象", "err")
+        return redirect(request.referrer)
+    d = {k: (f.getlist(k) if k == "K" else f.get(k, "").strip()) for k in f.keys() if k not in ("client_id", "date")}
+    d = {k: v for k, v in d.items() if v}
+    if rid:
+        db().execute("UPDATE records SET client_id=?, date=?, data=?, staff=? WHERE id=?",
+                     (cid, iso(f["date"]), json.dumps(d, ensure_ascii=False), session.get("name"), rid))
+    else:
+        rid = db().execute("INSERT INTO records (client_id,module,date,staff,data,created) VALUES (?,?,?,?,?,?)",
+                           (cid, "MNA", iso(f["date"]), session.get("name"), json.dumps(d, ensure_ascii=False), now())).lastrowid
+    db().commit()
+    flash("營養評估已儲存", "ok")
+    return redirect(url_for("record_view", module="MNA", rid=rid))
+
+
+@app.route("/api/mna", methods=["POST"])
+@login_required
+def api_mna():
+    d = {k: (request.form.getlist(k) if k == "K" else request.form.get(k, "")) for k in request.form.keys()}
+    s, full, total, b, bl, level = M.mna_score(d)
+    return jsonify(screen=s, full=full, total=total, bmi=b, bmi_label=bl, level=level, advice=M.mna_advice(d))
+
+
+@app.route("/hv/new")
+@app.route("/hv/<int:rid>/edit")
+@login_required
+def hv_form(rid=None):
+    r = rec_dict(db().execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()) if rid else None
+    cid = int(request.args.get("client") or (r and r["client_id"]) or 0)
+    c = get_client(cid) if cid else None
+    data, last = (r["data"] if r else {}), None
+    if c:
+        q = "SELECT * FROM records WHERE module='HV' AND client_id=?" + (" AND id<>?" if rid else "") + " ORDER BY date DESC, id DESC LIMIT 1"
+        row = db().execute(q, (cid, rid) if rid else (cid,)).fetchone()
+        last = rec_dict(row) if row else None
+        if not r and last:  # 新訪視：沿用上次各段
+            data = {k: last["data"].get(k) for k, _, carry in M.HV_SECTIONS if carry and last["data"].get(k)}
+            for k in ("target", "family_member", "problems", "days", "codes", "economy_opt") + tuple(f"cause_{i}" for i in range(len(M.HV_PROBLEMS))):
+                if last["data"].get(k):
+                    data[k] = last["data"][k]
+        if not data.get("basic"):
+            data.setdefault("_basic_suggest", f"{c.get('age') or ''}歲{ {'男': '男性', '女': '女性'}.get(c.get('gender'), '') }，長照福利身分別為{c.get('identity') or '—'}。")
+    return render_template("hv_form.html", r=r, c=c, data=data, last=last, M=M, cs=cs_with(c),
+                           day=r["date"] if r else date.today().isoformat())
+
+
+@app.route("/hv/save", methods=["POST"])
+@app.route("/hv/<int:rid>/save", methods=["POST"])
+@login_required
+def hv_save(rid=None):
+    f = request.form
+    cid = int(f.get("client_id") or 0)
+    if not cid:
+        flash("請選擇個案", "err")
+        return redirect(request.referrer)
+    LIST = {"target", "items", "problems", "days", "codes"}
+    d = {k: (f.getlist(k) if k in LIST else f.get(k, "").strip()) for k in f.keys() if k not in ("client_id", "date")}
+    d = {k: v for k, v in d.items() if v}
+    if rid:
+        db().execute("UPDATE records SET client_id=?, date=?, data=?, staff=? WHERE id=?", (cid, iso(f["date"]), json.dumps(d, ensure_ascii=False), session.get("name"), rid))
+    else:
+        rid = db().execute("INSERT INTO records (client_id,module,date,staff,data,created) VALUES (?,?,?,?,?,?)",
+                           (cid, "HV", iso(f["date"]), session.get("name"), json.dumps(d, ensure_ascii=False), now())).lastrowid
+    db().commit()
+    flash("家訪紀錄已儲存", "ok")
+    return redirect(url_for("record_view", module="HV", rid=rid))
+
+
+@app.route("/api/hv", methods=["POST"])
+@login_required
+def api_hv():
+    LIST = {"target", "items", "problems", "days", "codes"}
+    d = {k: (request.form.getlist(k) if k in LIST else request.form.get(k, "")) for k in request.form.keys()}
+    return jsonify(conclusion=M.hv_conclusion(d), problems=M.hv_problems_text(d))
+
+
+def simple_parse(mod, form):
+    spec = M.SIMPLE[mod]["fields"]
+    d = {}
+    for f in spec:
+        v = form.getlist(f["key"]) if f["type"] == "multi" else form.get(f["key"], "").strip()
+        if v:
+            d[f["key"]] = v
+    return d
+
+
+@app.route("/s/<mod>/new")
+@app.route("/s/<mod>/<int:rid>/edit")
+@login_required
+def simple_form(mod, rid=None):
+    if mod not in M.SIMPLE:
+        abort(404)
+    r = rec_dict(db().execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()) if rid else None
+    cid = int(request.args.get("client") or (r and r["client_id"]) or 0)
+    c = get_client(cid) if cid else None
+    data = r["data"] if r else {f["key"]: f["default"] for f in M.SIMPLE[mod]["fields"] if f.get("default")}
+    fam = []
+    if c:
+        past = [json.loads(x["data"]).get("family") for x in db().execute(
+            "SELECT data FROM records WHERE module IN ('PC','IR') AND client_id=? ORDER BY date DESC LIMIT 30", (cid,))]
+        fam = M.family_options(c, [p for p in past if p])
+        if not r and fam and "family" not in data:
+            data["family"] = fam[0]
+    return render_template("simple_form.html", mod=mod, spec=M.SIMPLE[mod], r=r, c=c, data=data, fam=fam, cs=cs_with(c),
+                           day=r["date"] if r else date.today().isoformat(), batch=False)
+
+
+@app.route("/s/<mod>/save", methods=["POST"])
+@app.route("/s/<mod>/<int:rid>/save", methods=["POST"])
+@login_required
+def simple_save(mod, rid=None):
+    f = request.form
+    cid = int(f.get("client_id") or 0)
+    if not cid:
+        flash("請選擇個案", "err")
+        return redirect(request.referrer)
+    d = json.dumps(simple_parse(mod, f), ensure_ascii=False)
+    if rid:
+        db().execute("UPDATE records SET client_id=?, date=?, data=?, staff=? WHERE id=?", (cid, iso(f["date"]), d, session.get("name"), rid))
+    else:
+        rid = db().execute("INSERT INTO records (client_id,module,date,staff,data,created) VALUES (?,?,?,?,?,?)",
+                           (cid, mod, iso(f["date"]), session.get("name"), d, now())).lastrowid
+    db().commit()
+    flash(M.SIMPLE[mod]["title"] + "已儲存", "ok")
+    return redirect(url_for("record_view", module=mod, rid=rid))
+
+
+@app.route("/api/auto/<mod>", methods=["POST"])
+@login_required
+def api_auto(mod):
+    cid = int(request.form.get("client_id") or 0)
+    if not cid:
+        return jsonify(desc="")
+    rows = lambda m, a, b: [json.loads(r["data"]) for r in db().execute(
+        "SELECT data FROM records WHERE module=? AND client_id=? AND date BETWEEN ? AND ? ORDER BY date", (m, cid, a, b))]
+    if mod == "MS":
+        ym = request.form.get("month") or date.today().strftime("%Y-%m")
+        a, b = ym + "-01", ym + "-31"
+        daily = rows("DAILY", a, b)
+        wd = sorted({to_date(r["date"]).weekday() for r in db().execute(
+            "SELECT date, data FROM records WHERE module='DAILY' AND client_id=? AND date BETWEEN ? AND ?", (cid, a, b)) if '"absent"' not in r["data"]})
+        names = "一二三四五六日"
+        wds = ("周" + "、".join(names[i] for i in wd)) if 0 < len(wd) < 5 else ("周一至周五" if len(wd) >= 5 else "")
+        return jsonify(desc=M.month_summary(daily, rows("IR", a, b), rows("PC", a, b), wds) if daily else "（這個月沒有每日照顧紀錄）")
+    if mod == "EA":
+        last = [json.loads(r["data"]) for r in db().execute(
+            "SELECT data FROM records WHERE module='DAILY' AND client_id=? ORDER BY date DESC LIMIT 10", (cid,))]
+        return jsonify(desc=M.adapt_summary({k: request.form.get(k) for k, _ in M.EA_ITEMS}, last))
+    if mod == "CL":
+        r = db().execute("SELECT MIN(date) f, MAX(date) l FROM records WHERE client_id=? AND module='DAILY'", (cid,)).fetchone()
+        cnt = lambda m: db().execute("SELECT COUNT(*) FROM records WHERE client_id=? AND module=?", (cid, m)).fetchone()[0]
+        return jsonify(desc=M.closure_stats(roc(r["f"]) or "—", roc(r["l"]) or "—", cnt("HV"), cnt("PC"), cnt("IR")))
+    return jsonify(desc="")
+
+
+@app.route("/s/PC/batch", methods=["GET", "POST"])
+@login_required
+def pc_batch():
+    """群組電訪：同一通知打給多位家屬（例：服務異動、暫停／恢復服務）"""
+    if request.method == "POST":
+        ids = [int(x) for x in request.form.getlist("clients")]
+        base = simple_parse("PC", request.form)
+        n = 0
+        for cid in ids:
+            d = dict(base)
+            fam = request.form.get(f"family_{cid}", "").strip()
+            if fam:
+                d["family"] = fam
+            db().execute("INSERT INTO records (client_id,module,date,staff,data,created) VALUES (?,?,?,?,?,?)",
+                         (cid, "PC", iso(request.form["date"]), session.get("name"), json.dumps(d, ensure_ascii=False), now()))
+            n += 1
+        db().commit()
+        flash(f"已建立 {n} 筆電訪紀錄", "ok")
+        return redirect(url_for("records_list", module="PC"))
+    cs = active_clients()
+    for c in cs:
+        past = [json.loads(x["data"]).get("family") for x in db().execute(
+            "SELECT data FROM records WHERE module IN ('PC','IR') AND client_id=? ORDER BY date DESC LIMIT 30", (c["id"],))]
+        c["fam"] = M.family_options(c, [p for p in past if p])
+    return render_template("simple_form.html", mod="PC", spec=M.SIMPLE["PC"], r=None, c=None, data={"target": ["家屬"], "mode": "電話", "items": ["服務異動通知"]},
+                           fam=[], cs=cs, day=date.today().isoformat(), batch=True)
+
+
+def client_records_summary(cid):
+    out = []
+    for r in db().execute("SELECT module, COUNT(*) n, MAX(date) last FROM records WHERE client_id=? GROUP BY module ORDER BY last DESC", (cid,)):
+        out.append({"module": r["module"], "name": MODULE_NAMES.get(r["module"], r["module"]), "n": r["n"], "last": r["last"]})
+    return out
 
 
 # ================================================================== 意見回饋

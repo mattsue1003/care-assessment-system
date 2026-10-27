@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block body %}
+{% set d = r.data %}
+<div class="pagehead"><div><h1>{{ title }}</h1><div class="muted">{{ r.name or '—' }} {{ r.case_no or '' }}・{{ r.date|roc_long }}・{{ r.staff or '' }}</div></div><span class="sp"></span>
+<div class="btns">{% if module=='MNA' %}<a class="btn" href="{{ url_for('nutri_form', rid=r.id) }}">✏️ 編輯</a>{% endif %}
+{% if module=='HV' %}<a class="btn" href="{{ url_for('hv_form', rid=r.id) }}">✏️ 編輯</a><a class="btn pri" href="{{ url_for('hv_form', client=r.client_id) }}">＋ 新家訪（沿用本次）</a>{% endif %}
+<a class="btn" href="{{ url_for('records_list', module=module, client=r.client_id) }}">此個案全部{{ title }}</a></div></div>
+{% if module in M.SIMPLE %}
+<div class="btns" style="margin-bottom:12px"><a class="btn" href="{{ url_for('simple_form', mod=module, rid=r.id) }}">✏️ 編輯</a><a class="btn pri" href="{{ url_for('simple_form', mod=module, client=r.client_id) }}">＋ 再新增一筆</a></div>
+<div class="card"><dl class="kv">{% for f in M.SIMPLE[module].fields if d.get(f.key) %}<dt>{{ f.label }}</dt><dd style="white-space:pre-wrap">{{ d[f.key]|join('、') if d[f.key] is not string else d[f.key] }}</dd>{% endfor %}</dl></div>
+{% elif module == 'HV' %}
+<div class="card"><dl class="kv"><dt>訪視對象</dt><dd>{{ (d.target or [])|join('、') }} {{ d.family_member or '' }}</dd><dt>事由</dt><dd>{{ (d.get('items') or [])|join('、') or d.item_text or '' }}</dd></dl></div>
+<div class="card">{% for k, title, carry in M.HV_SECTIONS if d.get(k) %}<h3 style="margin-top:10px">{{ title }}</h3><p style="white-space:pre-wrap;margin:4px 0">{{ d[k] }}</p>{% endfor %}
+<h3 style="margin-top:10px">參、問題分析</h3><p>{{ M.hv_problems_text(d) or d.problem_other or '—' }}</p>
+<h3 style="margin-top:10px">肆、結論</h3><p style="white-space:pre-wrap">{{ d.conclusion or M.hv_conclusion(d) }}</p></div>
+{% elif module == 'MNA' %}
+<div class="grid g2"><div class="card"><h2>結果</h2><dl class="kv">
+  <dt>身高／體重</dt><dd>{{ d.height or '—' }} cm／{{ d.weight or '—' }} kg</dd><dt>BMI</dt><dd>{{ score[3] or '—' }} {{ score[4] }}</dd>
+  <dt>篩檢分</dt><dd><b>{{ score[0] }}</b> / 14</dd><dt>完整評估</dt><dd>{{ score[1] if score[1] is not none else '未做' }}{{ ' / 16' if score[1] is not none }}</dd>
+  <dt>合計</dt><dd>{{ score[2] if score[2] is not none else '—' }}{{ ' / 30' if score[2] is not none }}</dd><dt>判讀</dt><dd><b>{{ score[5] }}</b></dd></dl></div>
+<div class="card"><h2>營養師建議</h2><p style="white-space:pre-wrap">{{ d.advice or '（未填）' }}</p>{% if d.note %}<h3>備註</h3><p>{{ d.note }}</p>{% endif %}</div></div>
+<div class="card"><h2>作答</h2><table class="t">{% for k, q, opts in M.MNA_SCREEN + M.MNA_FULL %}{% if d.get(k) %}<tr><td>{{ k }}. {{ q }}</td><td><b>{{ d.get(k)|join('、') if d.get(k) is not string else d.get(k) }}</b></td></tr>{% endif %}{% endfor %}
+  {% if d.mac %}<tr><td>臂中圍 MAC</td><td><b>{{ d.mac }} cm</b></td></tr>{% endif %}{% if d.cc %}<tr><td>小腿圍 CC</td><td><b>{{ d.cc }} cm</b></td></tr>{% endif %}</table></div>
+{% else %}
+<div class="card"><h2>欄位</h2><dl class="kv">{% for k, v in d.items() if k != '_detail' and v %}<dt>{{ k }}</dt><dd style="white-space:pre-wrap">{{ v }}</dd>{% endfor %}</dl></div>
+{% if d._detail %}{% set fv = d._detail %}
+<div class="card"><h2>明細</h2><dl class="kv">{% for k, v in (fv.fields or {}).items() if v and not k.startswith(('DC_','MD_','Company','Temp','Service_No','lbData','Data_ID','Person_ID','CountMX','lb','SRVSIGN','PostFlow','Sign_','Audit','Follow_Item','Link_ID')) %}<dt class="small">{{ M.FIELD_LABELS.get(k, k) }}</dt><dd style="white-space:pre-wrap">{{ v }}</dd>{% endfor %}
+{% for k, v in (fv.checks or {}).items() %}<dt class="small">{{ k }}</dt><dd>{{ v|join('、') }}</dd>{% endfor %}</dl>
+{% for g, rows in (fv.grids or {}).items() if rows %}<h3 style="margin-top:12px">{{ g }}</h3><table class="t">{% for row in rows %}<tr>{% for x in row %}<td class="small">{{ x }}</td>{% endfor %}</tr>{% endfor %}</table>{% endfor %}</div>
+{% endif %}{% endif %}
+{% endblock %}

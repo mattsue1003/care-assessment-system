@@ -61,11 +61,22 @@ def main():
         staff |= {r[0].strip() for r in con.execute(q) if r[0] and r[0].strip()}
     staff = {re.sub(r"（.*?）", "", s) for s in staff}
 
+    fam_names = set()
+    if con.execute("SELECT name FROM sqlite_master WHERE name='records'").fetchone():
+        for (data,) in con.execute("SELECT data FROM records"):
+            for m in re.finditer(r"([\u4e00-\u9fff]{2,4})\s*[/／-]\s*(案|配偶|母|父|女|子|妻|夫|媳|孫|兄|弟|姊|姐|妹|前妻|外傭|看護)", data):
+                fam_names.add(m.group(1))
+    for (p2,) in con.execute("SELECT phone2 FROM clients"):
+        for m in re.finditer(r"/([\u4e00-\u9fff]{2,4})/", p2 or ""):
+            fam_names.add(m.group(1))
+    fam_names = {n for n in fam_names if not n.startswith("案") and not re.search(r"(配偶|家屬|本人|其他|服務員|照顧|同住|外傭|看護|司機)", n)}
+    staff |= fam_names
+
     used = set()
     def fake_name():
         while True:
             n = rng.choice(SURNAMES) + "".join(rng.choice(GIVEN) for _ in range(rng.choice((1, 2, 2))))
-            if n not in used and n not in real_names and n not in staff:
+            if n not in used and not any(x in n or n in x for x in real_names | staff if len(x) >= 2):
                 used.add(n)
                 return n
 
@@ -116,6 +127,75 @@ def main():
             con.execute("UPDATE goal_reviews SET date=?, note=?, reviewer='示範治療師' WHERE id=?",
                         (iso_shift(r["date"], off), scrub(r["note"]), r["id"]))
 
+    # ---- 跨專業紀錄：只保留本系統格式（今日照顧、營養、家訪、電訪、異常事件），自由文字改成產生的示範文字 ----
+    import modules as M
+    import schema as S
+    has_rec = con.execute("SELECT name FROM sqlite_master WHERE name='records'").fetchone()
+    if has_rec:
+        con.execute("DELETE FROM records WHERE module NOT IN ('DAILY','MNA','HV','PC','IR','MS','CL','EA')")
+        rels = ["案子", "案女", "案妻", "案夫", "案媳", "案孫"]
+        fake_fam = lambda: fake_name() + "/" + rng.choice(rels)
+        PC_TXT = {"定期電訪": "電聯家屬了解案主近況，表示在家生活作息正常，無特殊狀況。", "請假追蹤": "家屬表示案主身體不適，今日請假在家休息。",
+                  "出勤調查": "詢問家屬下週出勤安排，家屬表示照常到中心。", "服務異動通知": "通知家屬中心服務異動事宜，家屬表示了解。"}
+        IR_TXT = {"身體狀況異常": "案主今早至中心量測血壓偏高，詢問無不適，持續觀察並追蹤。", "跌倒": "案主於中心行走時不慎跌倒，評估無明顯外傷。"}
+        for rid, cid, mod, dt, data in con.execute("SELECT id, client_id, module, date, data FROM records").fetchall():
+            d = json.loads(data)
+            off = offsets.get(cid, 0)
+            if mod == "DAILY":
+                if d.get("note"):
+                    d["note"] = scrub(d["note"])
+            elif mod == "MNA":
+                d.pop("note", None)
+            elif mod == "HV":
+                age = age_at(births[cid], iso_shift(dt, off)) if births.get(cid) and dt else ""
+                g = con.execute("SELECT gender FROM clients WHERE id=?", (cid,)).fetchone()[0]
+                d = {k: d[k] for k in ("target", "items", "problems", "days", "codes") + tuple(f"cause_{i}" for i in range(5)) if d.get(k)}
+                d.update({"family_member": fake_fam(), "process": "案主規律至日照中心接受服務，整體適應良好。",
+                          "basic": f"{age}歲{ {'男': '男性', '女': '女性'}.get(g, '')}，長照福利身分別為一般戶，常用語言為國語及台語。",
+                          "family": rng.choice(["與配偶同住，子女假日返家探視，主要照顧者為配偶。", "與子女同住，主要照顧者為案子，白天需上班。", "與案女同住，案女為主要照顧者。"]),
+                          "health": rng.choice(["有高血壓病史，規律服藥並固定回診。", "有糖尿病及高血壓病史，固定於醫院回診。", "曾有跌倒經驗，目前行走使用助行器。"]),
+                          "living": rng.choice(["居住於透天厝，臥室位於一樓，浴室已設置扶手及防滑墊。", "居住於公寓二樓，有電梯，居家環境整潔。"]),
+                          "economy": rng.choice(M.HV_ECONOMY), "social": rng.choice(["平日多在家中看電視，規律至日照中心參與活動。", "喜歡與人聊天，於中心參與團體活動意願高。"])})
+                d["conclusion"] = M.hv_conclusion(d)
+            elif mod in ("PC", "IR"):
+                keep = {k: d[k] for k in ("time", "mode", "target", "items", "kind", "notify") if d.get(k)}
+                if mod == "PC":
+                    keep["desc"] = next((PC_TXT[i] for i in d.get("items", []) if i in PC_TXT), PC_TXT["定期電訪"])
+                    keep["followup"] = "持續追蹤。"
+                else:
+                    keep["desc"] = next((IR_TXT[i] for i in d.get("kind", []) if i in IR_TXT), "案主於中心出現身體不適，經觀察後狀況穩定。")
+                    keep["handling"] = "已通知家屬，持續監測生命徵象。"
+                    keep["followup"] = "隔日電聯家屬追蹤。"
+                if d.get("family"):
+                    keep["family"] = fake_fam()
+                d = keep
+            elif mod in ("MS", "CL"):
+                d = {k: d[k] for k in ("target", "svc", "reason") if d.get(k)}
+            elif mod == "EA":
+                d = {k: d[k] for k, _ in M.EA_ITEMS if d.get(k)}
+                d["desc"] = M.adapt_summary(d)
+            con.execute("UPDATE records SET date=?, staff='示範人員', data=?, source_id='', created=NULL WHERE id=?",
+                        (iso_shift(dt, off), json.dumps(d, ensure_ascii=False), rid))
+        # 月照顧摘要、結案：用去識別化後的每日紀錄重新產生文字
+        for rid, cid, mod, dt, data in con.execute("SELECT id, client_id, module, date, data FROM records WHERE module IN ('MS','CL')").fetchall():
+            d = json.loads(data)
+            if mod == "MS":
+                ym = dt[:7]
+                daily = [json.loads(x[0]) for x in con.execute("SELECT data FROM records WHERE module='DAILY' AND client_id=? AND date LIKE ?", (cid, ym + "%"))]
+                d["month"] = ym
+                d["desc"] = M.month_summary(daily) if daily else "案主本月規律至中心參與活動，精神及情緒穩定。"
+                d["followup"] = "持續觀察並紀錄。"
+            else:
+                d["desc"] = M.closure_stats("—", dt, 0, 0, 0)
+            con.execute("UPDATE records SET data=? WHERE id=?", (json.dumps(d, ensure_ascii=False), rid))
+    # D61：整體評估建議改用系統依勾選產生的文字（原文可能含家屬、病史細節）
+    for aid, cid, dt, data in con.execute("SELECT id, client_id, date, data FROM assessments WHERE type='D61'").fetchall():
+        d = json.loads(data or "{}")
+        d = {k: (scrub(v) if isinstance(v, str) else v) for k, v in d.items()}
+        crow = con.execute("SELECT gender, birth FROM clients WHERE id=?", (cid,)).fetchone()
+        c = {"gender": crow[0], "age": age_at(crow[1], dt) if crow[1] and dt else None}
+        con.execute("UPDATE assessments SET data=?, summary=? WHERE id=?",
+                    (json.dumps(d, ensure_ascii=False), S.d61_narrative(c, d), aid))
     con.execute("DELETE FROM logs")
     con.execute("DELETE FROM users")
     con.execute("INSERT INTO users (username,name,title,pw_hash,role) VALUES ('1111','示範治療師','職能治療師',?, 'admin')",
@@ -129,8 +209,12 @@ def main():
 
     # 驗證：輸出檔裡不可出現任何真實姓名
     blob = open(DST, "rb").read()
-    leaks = [n for n in real_names | staff if len(n) >= 2 and n.encode() in blob]
+    leaks = [n for n in real_names | staff if len(n) >= 2 and n.encode() in blob and n not in ("家屬", "本人", "其他")]
     if leaks:
+        dump = "\n".join(sqlite3.connect(DST).iterdump())
+        for n in leaks:
+            i = dump.find(n)
+            print("LEAK", n, "…", dump[max(0, i - 60):i + 20].replace("\n", " "))
         os.remove(DST)
         raise SystemExit(f"去識別化失敗，仍含真實姓名 {len(leaks)} 筆，已刪除輸出檔")
     print(f"完成：{DST}（個案 {len(clients)} 位，已確認不含真實姓名）")

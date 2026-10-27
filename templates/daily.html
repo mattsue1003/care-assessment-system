@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>今日照顧紀錄</h1>
+<div class="muted">生命徵象＋如廁＋照顧紀錄合併一頁；已依每位長輩「平常的狀況」帶好，只要改有變化的</div></div><span class="sp"></span>
+<div class="btns"><a class="btn" href="?date={{ prev }}">◀ 前一天</a>
+<form method="get" style="display:inline"><input type="date" name="date" value="{{ day }}" onchange="this.form.submit()"></form>
+<a class="btn" href="?date={{ next }}">後一天 ▶</a></div></div>
+
+<div class="card fr" style="align-items:center">
+  <div><b>{{ day|roc_long }}</b>　<span class="muted">在案 {{ rows|length }} 位・已儲存 {{ saved }} 位</span></div>
+  <span style="flex:1"></span>
+  <div class="btns"><label class="small"><input type="checkbox" id="onlyAlert"> 只看異常／已修改</label>
+    <a class="btn sm" href="{{ url_for('records_list', module='DAILY') }}">歷史紀錄</a></div>
+</div>
+
+<form method="post" id="f">
+<input type="hidden" name="date" value="{{ day }}">
+{% for r in rows %}{% set c = r.c %}{% set d = r.d %}{% set p = 'c' ~ c.id ~ '_' %}
+<div class="card daily {{ 'absent' if d.absent }}" data-usual='{{ r.usual|tojson }}'>
+  <div class="dhead">
+    <label class="present"><input type="checkbox" name="{{ p }}present" value="1" {{ '' if d.absent else 'checked' }}> 到中心</label>
+    <a href="{{ url_for('client_view', cid=c.id) }}"><b>{{ c.name }}</b></a> <span class="muted small">{{ c.case_no }}</span>
+    {% if r.saved %}<span class="b ok">已存</span>{% endif %}
+    <span class="alerts">{% for a in r.alerts %}<span class="b bad">{{ a }}</span> {% endfor %}</span>
+  </div>
+  <div class="dgrid">
+    <div class="vit">
+      <label>時間<input type="time" name="{{ p }}time" value="{{ d.time or '' }}"></label>
+      <label>體溫<input type="number" step="0.1" inputmode="decimal" name="{{ p }}temp" value="{{ d.temp or '' }}" placeholder="36.5"></label>
+      <label>脈搏<input type="number" inputmode="numeric" name="{{ p }}pulse" value="{{ d.pulse or '' }}"></label>
+      <label>血壓<span class="bp"><input type="number" inputmode="numeric" name="{{ p }}sbp" value="{{ d.sbp or '' }}" placeholder="收縮">/<input type="number" inputmode="numeric" name="{{ p }}dbp" value="{{ d.dbp or '' }}" placeholder="舒張"></span></label>
+      <label class="opt">複測血壓<input type="text" name="{{ p }}bp2" value="{{ d.bp2 or '' }}" placeholder="例 11:50 106/58"></label>
+      <label class="opt">體重<input type="number" step="0.1" inputmode="decimal" name="{{ p }}weight" value="{{ d.weight or '' }}" placeholder="每月"></label>
+    </div>
+    <div class="sels">
+      {% for k, label, typ, opts, grp in M.DAILY_FIELDS if typ == 'sel' %}
+      <label>{{ label }}<select name="{{ p }}{{ k }}" data-k="{{ k }}">{% for o in opts %}<option {{ 'selected' if d.get(k)==o }}>{{ o }}</option>{% endfor %}</select></label>
+      {% endfor %}
+    </div>
+    <div class="dnote"><input type="text" name="{{ p }}note" value="{{ d.note or '' }}" placeholder="備註／異常（沒事不用填）" list="dailyTpl"></div>
+  </div>
+</div>
+{% endfor %}
+<datalist id="dailyTpl">{% for t in M.DAILY_NOTE_TPL %}<option>{{ t }}</option>{% endfor %}</datalist>
+<button class="fab-save" style="display:block" type="submit">💾 儲存全部</button>
+<div class="btns" style="margin:16px 0 80px"><button class="btn pri">💾 儲存全部（{{ rows|length }} 位）</button></div>
+</form>
+{% endblock %}
+{% block script %}
+<script>
+function check(card){
+  const usual = JSON.parse(card.dataset.usual || '{}'); let changed = false;
+  card.querySelectorAll('select[data-k]').forEach(s => { const diff = usual[s.dataset.k] && s.value !== usual[s.dataset.k]; s.classList.toggle('chg', !!diff); if (diff) changed = true; });
+  const v = n => parseFloat((card.querySelector(`[name$="_${n}"]`) || {}).value);
+  const al = [];
+  if (v('temp') >= 37.5) al.push('體溫 ' + v('temp')); if (v('sbp') >= 160 || v('sbp') < 90) al.push('收縮壓 ' + v('sbp'));
+  if (v('dbp') >= 100) al.push('舒張壓 ' + v('dbp')); if (v('pulse') > 100 || v('pulse') < 50) al.push('脈搏 ' + v('pulse'));
+  ['mood', 'eat_amt'].forEach(k => { const s = card.querySelector(`[data-k=${k}]`); if (s && ['焦慮不安', '易發怒', '吃完3分', '未進食'].includes(s.value)) al.push(s.value); });
+  card.querySelector('.alerts').innerHTML = al.map(a => `<span class="b bad">${a}</span>`).join(' ');
+  const absent = !card.querySelector('.present input').checked; card.classList.toggle('absent', absent);
+  if ((card.querySelector('.dnote input').value || '').trim()) changed = true;
+  card.dataset.flag = (al.length || changed || absent) ? '1' : '';
+}
+document.querySelectorAll('.daily').forEach(check);
+document.getElementById('f').addEventListener('input', e => { const c = e.target.closest('.daily'); if (c) check(c); });
+document.getElementById('f').addEventListener('change', e => { const c = e.target.closest('.daily'); if (c) check(c); });
+document.getElementById('onlyAlert').addEventListener('change', e => document.querySelectorAll('.daily').forEach(c => c.style.display = (e.target.checked && !c.dataset.flag) ? 'none' : ''));
+</script>
+{% endblock %}

@@ -4,11 +4,13 @@
 (function () {
 'use strict';
 const S = window.SCHEMA;
-const STORE = 'care_trial_v1';
+const STORE = 'care_trial_v2';
 const D61_FIELDS = {}; S.D61.forEach(s => s.fields.forEach(f => D61_FIELDS[f.key] = f));
 const D61_RADIOS = Object.values(D61_FIELDS).filter(f => f.type === 'radio');
 const LIST_KEYS = new Set(Object.values(D61_FIELDS).filter(f => f.type === 'multi').map(f => f.key)
   .concat(S.ICOPE_ALL.map(([k]) => k + '_actions')));
+const EXTRA = new Set(S.EXTRA_OPTS || []);
+const tplChips = (key, target) => (S.TEMPLATES || {})[key] ? `<div class="tpl" data-for="${target}">${S.TEMPLATES[key].map(t => `<button type="button" class="tchip">${h(t)}</button>`).join('')}</div>` : '';
 const BAD_OPTS = ['是', '有錯誤', '錯', '有困難', '聽不到', '雙手扶扶手', '無法完成', '需監視'];
 
 /* ============================== 工具 ============================== */
@@ -40,6 +42,7 @@ let DB;
 function load() {
   try { DB = JSON.parse(localStorage.getItem(STORE)); } catch (e) { DB = null; }
   if (!DB || !DB.clients) DB = JSON.parse(JSON.stringify(window.DEMO_DATA));
+  DB.records = DB.records || [];
 }
 function save() { try { localStorage.setItem(STORE, JSON.stringify(DB)); } catch (e) { alert('瀏覽器儲存空間無法使用，資料將無法保存'); } }
 const nextId = () => DB.seq++;
@@ -248,6 +251,7 @@ function layout(active, body) {
     ${nav('/', 'home', '🏠', '首頁／待辦')}
     <div class="grp">基本資料</div>${nav('/clients', 'clients', 'B2', '個案名冊')}${nav('/aids', 'aids', 'B2c', '輔具管理')}
     <div class="grp">照顧評估</div>${nav('/assess/D61', 'D61', 'D61', '職能治療評估')}${nav('/assess/ICOPE', 'ICOPE', '六力', 'ICOPE 評估')}
+    <div class="grp">照顧與跨專業</div>${nav('/daily', 'DAILY', '照服', '今日照顧紀錄')}${nav('/rec/MNA', 'MNA', '營養', '營養評估')}${nav('/rec/HV', 'HV', '社工', '家訪紀錄')}${nav('/rec/PC', 'PC', '社工', '電訪紀錄')}${nav('/rec/IR', 'IR', '⚠️', '異常事件')}${nav('/rec/MS', 'MS', '社工', '月照顧摘要')}${nav('/rec/CL', 'CL', '社工', '結案紀錄')}${nav('/rec/EA', 'EA', '適應', '環境適應評估')}
     <div class="grp">自立支援</div>${nav('/goals', 'goals', 'B10', '復能目標追蹤')}
     <div class="grp">評鑑與報表</div>${nav('/reports', 'reports', '📦', '評鑑佐證／匯出')}
     <div class="grp">系統</div>${nav('/feedback', 'feedback', '💬', '試用意見回饋')}${nav('/settings', 'settings', '⚙️', '設定／重設資料')}
@@ -255,7 +259,7 @@ function layout(active, body) {
   </nav><main>
     ${f ? `<div class="flash ${f[1]}">${h(f[0])}</div>` : ''}${body}
   </main></div>
-  <nav class="tabbar">${tab('/', 'home', '🏠', '首頁')}${tab('/clients', 'clients', '👥', '個案')}${tab('/assess/ICOPE', 'ICOPE', '🧭', '六力')}${tab('/assess/D61', 'D61', '📝', 'D61')}
+  <nav class="tabbar">${tab('/', 'home', '🏠', '首頁')}${tab('/clients', 'clients', '👥', '個案')}${tab('/assess/ICOPE', 'ICOPE', '🧭', '六力')}${tab('/daily', 'DAILY', '📋', '照顧')}
     <a href="#" onclick="App.nav(true);return false"><b>☰</b>更多</a></nav>`;
 }
 function cardify(root) {
@@ -266,7 +270,8 @@ function cardify(root) {
     t.classList.add('cards');
   });
 }
-const clientOpts = (sel) => activeClients().map(x => `<option value="${x.id}" ${x.id === +sel ? 'selected' : ''}>${h(x.label)}</option>`).join('');
+const clientOpts = (sel) => { const list = activeClients(); if (sel && !list.some(x => x.id === +sel) && client(sel)) list.unshift(Object.assign(client(sel), { label: client(sel).label + '（' + client(sel).status + '）' }));
+  return list.map(x => `<option value="${x.id}" ${x.id === +sel ? 'selected' : ''}>${h(x.label)}</option>`).join(''); };
 const opt = (list, sel) => list.map(o => `<option ${o === sel ? 'selected' : ''}>${h(o)}</option>`).join('');
 
 /* ============================== 頁面 ============================== */
@@ -402,6 +407,8 @@ V.client = (id) => {
     ${b.changes.length ? `<div class="src">最近兩次的變化：<ul class="changes" style="margin:4px 0 0">${b.changes.map(([l, a1, a2, k]) => `<li class="${k}">${h(l)}：${h(a1)} → <b>${h(a2)}</b>（${k}）</li>`).join('')}</ul></div>` : ''}
     <div class="tbl-wrap"><table class="t trend"><tr><th>項目</th>${dt.dates.map(d => `<th class="c">${roc(d)}</th>`).join('')}</tr>
     ${dt.rows.map(([l, v, o]) => `<tr><td>${h(l)}</td>${v.map(x => `<td class="c">${o && x && x !== o[0] ? badge(x, 'bad') : (h(x) || '—')}</td>`).join('')}</tr>`).join('')}</table></div></div>` : ''}
+  <div class="card"><h2>跨專業紀錄</h2><div class="btns" style="margin-bottom:8px"><a class="btn sm pri" href="#/nutri/new?client=${id}">＋ 營養評估</a><a class="btn sm pri" href="#/hv/new?client=${id}">＋ 家訪紀錄</a><a class="btn sm" href="#/s/PC/new?client=${id}">＋ 電訪</a><a class="btn sm" href="#/s/IR/new?client=${id}">＋ 異常事件</a><a class="btn sm" href="#/daily">今日照顧紀錄</a></div>
+    <div class="tbl-wrap"><table class="t"><tr><th>紀錄</th><th>筆數</th><th>最近</th><th></th></tr>${ALL_MODS.map(m => { const rs = recs(m, id); return rs.length ? `<tr><td class="ttl">${MOD_NAME[m]}</td><td>${rs.length}</td><td>${roc(rs[0].date)}</td><td class="btns wide"><a class="btn sm" href="#/rec/${m}?client=${id}">查看</a></td></tr>` : ''; }).join('') || '<tr><td colspan="4" class="empty">尚無紀錄</td></tr>'}</table></div></div>
   <div class="card"><h2>B9 輔具使用</h2>${b.aids.length ? `<div class="tbl-wrap"><table class="t"><tr><th>輔具</th><th>類別</th><th>來源</th><th>開始使用</th><th>適配評估</th><th>使用訓練</th><th>最近檢查</th><th>狀態</th><th>備註</th><th></th></tr>
     ${b.aids.map(x => `<tr><td class="ttl"><b>${h(x.item)}</b></td><td>${h(x.category)}</td><td>${h(x.source) || '—'}</td>
       ${['start_date', 'fit_date', 'train_date', 'check_date'].map(k => `<td>${x[k] ? roc(x[k]) : (x.status === '使用中' && k !== 'check_date' ? badge('待補', 'warn') : '—')}</td>`).join('')}
@@ -470,11 +477,11 @@ V.d61Form = (id, q) => {
       ${hasRadio ? '<button type="button" class="btn sm" style="margin-top:6px" onclick="App.allNormal(this)">本區全部正常</button>' : ''}</div><div>
       ${sec.fields.map(f => { const v = data[f.key]; const pv = prev ? prev.data[f.key] : null;
         let inner;
-        if (f.type === 'multi') inner = `<div class="pills">${f.options.map(o => `<label class="pill ${['adl_help', 'bpsd'].includes(f.key) ? 'bad' : ''}"><input type="checkbox" name="${f.key}" value="${h(o)}" ${(v || []).includes(o) ? 'checked' : ''}><span>${h(o)}</span></label>`).join('')}</div>
-          ${f.other ? `<input type="text" class="other" name="${f.key}_other" value="${h(data[f.key + '_other'])}" placeholder="其他：">` : ''}${pv && pv.length ? `<div class="small muted" style="margin-top:4px">上次：${h(pv.join('、'))}</div>` : ''}`;
+        if (f.type === 'multi') inner = `<div class="pills">${f.options.map(o => `<label class="pill ${['adl_help', 'bpsd'].includes(f.key) ? 'bad' : ''}"><input type="checkbox" name="${f.key}" value="${h(o)}" ${(v || []).includes(o) ? 'checked' : ''}><span>${h(o)}${EXTRA.has(o) ? '<sup class="new" title="依過去紀錄新增；care99 請寫在「其他」">新</sup>' : ''}</span></label>`).join('')}</div>
+          ${f.other ? `<input type="text" class="other" name="${f.key}_other" value="${h(data[f.key + '_other'])}" placeholder="其他：">` : ''}${tplChips(f.key, f.key + '_other')}${pv && pv.length ? `<div class="small muted" style="margin-top:4px">上次：${h(pv.join('、'))}</div>` : ''}`;
         else if (f.type === 'radio') inner = `<div class="pills" data-prev="${h(pv || '')}">${f.options.map((o, i) => `<label class="pill ${i ? 'bad' : ''}"><input type="radio" name="${f.key}" value="${h(o)}" ${v === o ? 'checked' : ''}><span>${h(o)}</span></label>`).join('')}</div>
-          ${f.note ? `<input type="text" class="note-in" name="${f.key}_note" value="${h(data[f.key + '_note'])}" placeholder="備註部位／說明">` : ''}`;
-        else inner = `<input type="text" name="${f.key}" value="${h(v)}" style="width:100%">`;
+          ${f.note ? `<input type="text" class="note-in" name="${f.key}_note" value="${h(data[f.key + '_note'])}" placeholder="備註">` : ''}${tplChips(f.key, f.key + '_note')}`;
+        else inner = `<input type="text" name="${f.key}" value="${h(v)}" style="width:100%">${tplChips(f.key, f.key)}`;
         return `<div class="fld ${f.type !== 'radio' ? 'wide' : ''}"><div class="lb">${h(f.label)}${f.hint ? `<div class="hint">${h(f.hint)}</div>` : ''}</div><div>${inner}</div>
           ${f.type === 'radio' ? `<div class="prev">${pv ? '上次：' + h(pv) : ''}</div>` : ''}</div>`; }).join('')}
       <div class="fld wide"><div class="lb muted">備註</div><input type="text" name="s${sec.no}_note" value="${h(data['s' + sec.no + '_note'])}" style="width:100%"></div></div></div>`;
@@ -661,6 +668,247 @@ V.settings = () => layout('settings', `<div class="pagehead"><h1>設定／重設
     <h2 style="margin-top:18px">正式版</h2><p class="small muted" style="margin:0">正式使用請下載 GitHub 上的 Python 版，資料只存在單位自己的電腦，並可匯入 Excel 名冊、產生 PDF。</p>
     <p><a href="https://github.com/mattsue1003/care-assessment-system" target="_blank" rel="noopener">github.com/mattsue1003/care-assessment-system</a></p></div></div>`);
 V.notFound = () => layout('', '<div class="card empty">找不到這個頁面。<a href="#/">回首頁</a></div>');
+
+/* ============================== 跨專業紀錄：今日照顧、營養評估、家訪 ============================== */
+const recs = (mod, cid) => DB.records.filter(r => r.module === mod && (!cid || r.client_id === +cid)).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+const MOD_NAME = { DAILY: '今日照顧紀錄', MNA: '營養評估（MNA）', HV: '社工家訪紀錄', PC: '電訪紀錄', IR: '異常事件紀錄', MS: '月照顧摘要', CL: '結案紀錄', EA: '環境適應評估' };
+const ALL_MODS = ['DAILY', 'MNA', 'HV', 'PC', 'IR', 'MS', 'CL', 'EA'];
+const EA_KEYS = ['ea_exit', 'ea_act', 'ea_peer', 'ea_staff', 'ea_face', 'ea_behav'];
+function adaptSummary(d, cid) {
+  const sc = EA_KEYS.map(k => parseInt(d[k])).filter(x => !isNaN(x)); if (!sc.length) return '（請先勾選 6 項分數）';
+  const total = sc.reduce((a, b) => a + b, 0), avg = total / sc.length; const level = avg >= 4 ? '適應良好' : avg >= 3 ? '適應狀況逐漸進步' : '適應狀況待加強';
+  const o = [`案主至今${level}（總分 ${total}/${sc.length * 5}）`]; const pres = recs('DAILY', cid).slice(0, 10).map(r => r.data).filter(r => !r.absent);
+  if (pres.length) { o.push(pres.filter(r => r.mood === '愉快').length >= pres.length * 0.7 ? '情緒平穩' : '情緒時有起伏'); o.push(pres.some(r => dailyAlerts(r).length) ? '生命徵象偶有異常，持續追蹤' : '生命徵象穩定');
+    o.push(pres.filter(r => r.eat_amt === '全部吃完').length >= pres.length * 0.7 ? '早點及午餐皆吃完' : '進食量時有不足'); }
+  const g = k => parseInt(d[k]) || 0; o.push(g('ea_act') >= 4 ? '中心活動能主動參與' : g('ea_act') === 3 ? '中心活動經邀請後可參與' : '活動參與較被動，需多鼓勵');
+  if (g('ea_peer') >= 4) o.push('團體活動時會與其他長輩互動'); if (g('ea_exit') && g('ea_exit') <= 2) o.push('偶有找出口、想回家情形，需加強安撫與陪伴'); return o.join('，') + '。';
+}
+function monthSummary(cid, ym) {
+  const inM = r => r.date.startsWith(ym); const daily = recs('DAILY', cid).filter(inM).reverse(); if (!daily.length) return '（這個月沒有每日照顧紀錄）';
+  const pres = daily.filter(r => !r.data.absent).map(r => r.data); const num = (r, k) => { const v = parseFloat(r[k]); return isNaN(v) ? null : v; };
+  const rng = k => { const v = pres.map(r => num(r, k)).filter(x => x !== null); return v.length ? [Math.min(...v), Math.max(...v)] : null; };
+  const most = k => { const c = {}; pres.forEach(r => { if (r[k] && r[k] !== '未記錄') c[r[k]] = (c[r[k]] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]); };
+  const wd = [...new Set(daily.filter(r => !r.data.absent).map(r => toDate(r.date).getDay()))].sort(); const nm = '日一二三四五六';
+  const wds = wd.length >= 5 ? '周一至周五' : wd.length ? '周' + wd.map(i => nm[i]).join('、') : '';
+  const o = [`案主${wds ? '規律' + wds + '至' : '至'}中心接受照顧及參與活動，本月出席 ${pres.length} 天${daily.length > pres.length ? `、請假 ${daily.length - pres.length} 天` : ''}。`];
+  const t = rng('temp'), sb = rng('sbp'), db = rng('dbp'), pu = rng('pulse'); const vit = [];
+  if (t) vit.push(`體溫介於 ${t[0]}–${t[1]}℃`); if (sb && db) vit.push(`血壓介於 ${sb[0]}–${sb[1]}／${db[0]}–${db[1]} mmHg`); if (pu) vit.push(`脈搏 ${pu[0]}–${pu[1]} 次/分`);
+  if (vit.length) o.push('量測生命徵象' + vit.join('，') + '。'); const al = pres.filter(r => dailyAlerts(r).length).length; if (al) o.push(`本月有 ${al} 天生命徵象或狀況異常，已通知護理師追蹤。`);
+  if (most('activity').length) o.push(`活動參與多為${most('activity').join('、')}。`);
+  const eh = most('eat_help')[0], ea = most('eat_amt')[0], wa = most('water_amt')[0]; if (eh || wa) o.push(`飲食多為${eh || ''}${ea ? '、' + ea : ''}${wa ? `；飲水約 ${wa} c.c.` : ''}。`);
+  if (most('mood').length) o.push(`精神多為${most('mental').join('、')}，情緒多為${most('mood').join('、')}。`);
+  recs('IR', cid).filter(inM).forEach(r => o.push('異常事件：' + (r.data.kind || []).join('、') + '。' + (r.data.desc || '').slice(0, 60)));
+  const npc = recs('PC', cid).filter(inM).length; if (npc) o.push(`本月電訪家屬 ${npc} 次。`);
+  return o.map((x, i) => `${i + 1}.${x}`).join('\n');
+}
+function closureStats(cid) { const d = recs('DAILY', cid); const n = m => recs(m, cid).length;
+  return `1.服務開始：${d.length ? roc(d[d.length - 1].date) : '—'}\n2.服務結束：${d.length ? roc(d[0].date) : '—'}\n3.家訪次數：${n('HV')}次\n4.電訪次數：${n('PC')}次\n5.異常事件：${n('IR')}次\n6.申訴次數：0次`; }
+function familyOpts(c) { const out = []; (c.phone2 || '').split(/\s+/).forEach(p => { const b = p.split('/'); if (b.length >= 3) out.push(b[1] + '/' + b[2]); });
+  DB.records.filter(r => ['PC', 'IR'].includes(r.module) && r.client_id === c.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).forEach(r => { if (r.data.family && !out.includes(r.data.family)) out.push(r.data.family); });
+  return out.slice(0, 8); }
+function simpleField(f, d, fam) {
+  const v = d[f.key]; let inner;
+  if (f.type === 'multi') inner = `<div class="pills">${f.options.map(o => `<label class="pill"><input type="checkbox" name="${f.key}" value="${h(o)}" ${(v || []).includes(o) ? 'checked' : ''}><span>${h(o)}</span></label>`).join('')}</div>`;
+  else if (f.type === 'radio') inner = `<div class="pills">${f.options.map(o => `<label class="pill"><input type="radio" name="${f.key}" value="${h(o)}" ${v === o ? 'checked' : ''}><span>${h(o)}</span></label>`).join('')}</div>`;
+  else if (f.type === 'time') inner = `<input type="time" name="${f.key}" value="${h(v)}">`;
+  else if (f.type === 'month') inner = `<input type="month" name="${f.key}" value="${h(v || todayISO().slice(0, 7))}">`;
+  else if (f.type === 'family') inner = `<input type="text" name="${f.key}" value="${h(v)}" placeholder="姓名／關係" style="width:100%">${fam.length ? `<div class="tpl" data-for="${f.key}" data-replace="1">${fam.map(x => `<button type="button" class="tchip">${h(x)}</button>`).join('')}</div>` : ''}`;
+  else if (f.type === 'textarea') inner = `${f.auto ? `<div class="btns" style="margin-bottom:6px"><button type="button" class="btn sm acc" onclick="App.autoGen('${f.key}','${f.auto}')">✨ 自動產生</button></div>` : ''}<textarea name="${f.key}" id="ta_${f.key}" style="min-height:${f.auto ? 160 : 80}px">${h(v)}</textarea>${f.templates ? `<div class="tpl" data-for="${f.key}" data-nosep="1">${f.templates.map(t => `<button type="button" class="tchip">${h(t)}</button>`).join('')}</div>` : ''}`;
+  else inner = `<input type="text" name="${f.key}" value="${h(v)}" style="width:100%">`;
+  return `<div class="fld wide"><div class="lb">${h(f.label)}</div><div>${inner}</div></div>`;
+}
+V.simpleForm = (mod, id, q, batch) => {
+  const spec = S.SIMPLE[mod]; const r = id ? DB.records.find(x => x.id === +id) : null; const cid = +(q.client || (r && r.client_id) || 0); const c = cid ? client(cid) : null;
+  const d = r ? r.data : Object.fromEntries(spec.fields.filter(f => f.default).map(f => [f.key, f.default])); if (batch) d.items = ['服務異動通知'];
+  const fam = c ? familyOpts(c) : []; if (!r && fam.length && !d.family) d.family = fam[0];
+  const who = batch ? `<div class="card"><h2>通知對象 <label class="small" style="font-weight:400"><input type="checkbox" onclick="document.querySelectorAll('[name=clients]').forEach(x=>x.checked=this.checked)"> 全選</label></h2><div class="grid g3">${activeClients().map(x => { const fo = familyOpts(x);
+    return `<div style="display:flex;gap:6px;align-items:center"><label><input type="checkbox" name="clients" value="${x.id}"> ${h(x.name)}</label><input type="text" name="family_${x.id}" value="${h(fo[0] || '')}" placeholder="家屬" style="flex:1;font-size:13px;padding:4px 6px;min-height:0"></div>`; }).join('')}</div></div>` : '';
+  const bar = batch ? `<div class="formbar"><div class="fr"><div><label class="f">日期</label><input type="date" name="date" value="${todayISO()}" required></div><span style="flex:1"></span><div class="btns hide-m"><button class="btn pri">💾 儲存</button></div></div></div><button class="fab-save" type="submit">💾 儲存</button>`
+    : recFormBar(mod, c, r ? r.date : todayISO(), !!r, `/s/${mod}/new`);
+  return layout(mod, `<div class="pagehead"><div><h1>${batch ? '群組電訪（一次通知多位家屬）' : spec.title}</h1><div class="muted">${batch ? '勾選要通知的個案，內容寫一次，系統會為每位個案各建一筆電訪紀錄' : '常用內容點一下就帶入；聯絡家屬從過去紀錄自動帶出'}</div></div>
+    <span class="sp"></span>${mod === 'PC' && !batch ? '<a class="btn" href="#/s/PC/batch">群組電訪</a>' : ''}</div>
+    <form id="f" onsubmit="return App.saveSimple(event,'${mod}',${id || 0},${batch ? 1 : 0})">${bar}${(c || batch) ? who + `<div class="card">${spec.fields.filter(f => !(batch && f.type === 'family')).map(f => simpleField(f, d, fam)).join('')}
+      <div class="btns" style="margin-top:12px"><button class="btn pri">💾 儲存</button></div></div>` : '<div class="card empty">請先選擇個案</div>'}</form>`);
+};
+function dailyAlerts(d) {
+  const n = k => { const v = parseFloat(d[k]); return isNaN(v) ? null : v; }; const o = [];
+  const t = n('temp'), p = n('pulse'), s = n('sbp'), di = n('dbp');
+  if (t !== null && t >= 37.5) o.push('體溫 ' + t); if (s !== null && (s >= 160 || s < 90)) o.push('收縮壓 ' + s);
+  if (di !== null && di >= 100) o.push('舒張壓 ' + di); if (p !== null && (p > 100 || p < 50)) o.push('脈搏 ' + p);
+  if (['焦慮不安', '易發怒'].includes(d.mood)) o.push('情緒' + d.mood); if (['吃完3分', '未進食'].includes(d.eat_amt)) o.push('進食' + d.eat_amt);
+  if (d.stool === '3次以上') o.push('大便 3 次以上'); return o;
+}
+function usualDaily(cid) {
+  const rows = recs('DAILY', cid).slice(0, 20).map(r => r.data); const out = Object.assign({}, S.DAILY_DEFAULT);
+  Object.keys(S.DAILY_DEFAULT).forEach(k => { const c = {}; rows.forEach(r => { if (r[k] && r[k] !== '未記錄') c[r[k]] = (c[r[k]] || 0) + 1; });
+    const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; if (best) out[k] = best[0]; });
+  return out;
+}
+function bmiBand(h, w) { const b = Math.round(parseFloat(w) / Math.pow(parseFloat(h) / 100, 2) * 10) / 10; if (!isFinite(b) || !b) return [null, null, ''];
+  return [b, b <= 18.5 ? 0 : b <= 24 ? 1 : b <= 27 ? 2 : 3, b < 18.5 ? '體位過輕' : b < 24 ? '體位正常' : b < 27 ? '體位過重' : '肥胖']; }
+function mnaScore(d) {
+  const pick = (k, o) => { const m = (o || []).find(x => x[0] === d[k]); return m ? m[1] : 0; };
+  let s = S.MNA_SCREEN.reduce((a, [k, , o]) => a + pick(k, o), 0); const [b, bsc, bl] = bmiBand(d.height, d.weight); s += bsc || 0;
+  let full = null;
+  if (S.MNA_FULL.some(([k]) => d[k] && (!Array.isArray(d[k]) || d[k].length)) || d.mac || d.cc) {
+    full = 0; S.MNA_FULL.forEach(([k, , o]) => { if (o === 'protein') { const n = (d.K || []).length; full += n === 3 ? 1 : n === 2 ? 0.5 : 0; } else full += pick(k, o); });
+    const mac = parseFloat(d.mac); if (!isNaN(mac)) full += mac >= 22 ? 1 : mac >= 21 ? 0.5 : 0; const cc = parseFloat(d.cc); if (!isNaN(cc)) full += cc >= 31 ? 1 : 0;
+  }
+  const total = full === null ? null : s + full;
+  const level = total !== null ? (total >= 24 ? '營養狀況良好' : total >= 17 ? '有營養不良危險' : '營養不良') : (s >= 12 ? '正常（≧12）' : '可能營養不良，建議完成完整評估／營養師介入');
+  return { s, full, total, b, bl, level };
+}
+function mnaAdvice(d) {
+  const [b, , bl] = bmiBand(d.height, d.weight); const p = []; if (b) p.push(`BMI:${b}(${bl})`);
+  if (d.texture) p.push('採' + (['體位過重', '肥胖'].includes(bl) && d.reduce ? '減重、' : '') + d.texture + (d.protein_g ? `(蛋白質${d.protein_g}g)` : ''));
+  if (d.kcal) p.push(`一日${d.kcal}大卡`);
+  const port = [['p_staple', '主食'], ['p_protein', '蛋白質'], ['p_veg', '蔬菜'], ['p_snack', '點心']].filter(([k]) => d[k]).map(([k, n]) => `${n}${d[k]}份`);
+  if (port.length) p.push('建議' + port.join('、')); if (d.water) p.push(`日照給水${d.water}毫升`); return p.join('，');
+}
+const CN = '一二三四五六七八';
+function hvDays(days) { const ds = S.WEEKDAYS.filter(d => (days || []).includes(d)); if (!ds.length) return ''; const ix = ds.map(d => S.WEEKDAYS.indexOf(d));
+  return ds.length >= 3 && ix.every((v, i) => v === ix[0] + i) ? `周${ds[0]}至周${ds[ds.length - 1]}` : '周' + ds.join('、'); }
+function hvConclusion(d) {
+  const codes = d.codes || []; const bb = codes.filter(c => c.startsWith('BB')); const out = []; const main = [];
+  if (bb.length) main.push(`日間照顧服務(${bb[0]})`); if (codes.includes('BD03')) main.push('社區式交通接送服務(BD03)');
+  if (main.length) out.push(`持續提供${hvDays(d.days)}` + main.join('及')); if (codes.includes('GA03')) out.push('必要時提供日間照顧喘息服務(GA03)');
+  if (d.concl_extra) out.push(d.concl_extra); return out.map((s, i) => `${CN[i]}、${s}`).join('。') + (out.length ? '。' : '');
+}
+function hvProblems(d) {
+  const out = S.HV_PROBLEMS.map(([p], i) => (d.problems || []).includes(p) ? p + (d['cause_' + i] ? '/' + d['cause_' + i] : '') : '').filter(Boolean);
+  if (d.problem_other) out.push(d.problem_other); return out.map((s, i) => `${CN[i]}、${s}`).join('；');
+}
+function recData(form, lists) { const fd = new FormData(form); const d = {};
+  for (const k of new Set(fd.keys())) { if (['client_id', 'date'].includes(k)) continue; const v = fd.getAll(k).map(x => String(x).trim()).filter(Boolean); if (!v.length) continue; d[k] = lists.includes(k) ? v : v[v.length - 1]; }
+  return d; }
+function saveRec(mod, id, cid, date, data) {
+  const rec = { client_id: +cid, module: mod, date, staff: '示範人員', data };
+  if (id) Object.assign(DB.records.find(r => r.id === id), rec); else { id = nextId(); DB.records.push(Object.assign({ id }, rec)); } save(); return id;
+}
+
+V.daily = (q) => {
+  const day = iso(q.date) || todayISO(); const cs = activeClients(); let saved = 0;
+  const cards = cs.map(c => { const ex = DB.records.find(r => r.module === 'DAILY' && r.client_id === c.id && r.date === day); if (ex) saved++;
+    const usual = usualDaily(c.id); const d = ex ? ex.data : usual; const p = `c${c.id}_`;
+    const sels = S.DAILY_FIELDS.filter(f => f[2] === 'sel').map(([k, l, , opts]) => `<label>${l}<select name="${p}${k}" data-k="${k}">${opts.map(o => `<option ${d[k] === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`).join('');
+    const num = (k, l, ph = '', step = '1') => `<label>${l}<input type="number" step="${step}" inputmode="decimal" name="${p}${k}" value="${h(d[k])}" placeholder="${ph}"></label>`;
+    return `<div class="card daily ${d.absent ? 'absent' : ''}" data-usual='${h(JSON.stringify(usual))}'>
+      <div class="dhead"><label class="present"><input type="checkbox" name="${p}present" value="1" ${d.absent ? '' : 'checked'}> 到中心</label>
+        <a href="#/clients/${c.id}"><b>${h(c.name)}</b></a> <span class="muted small">${h(c.case_no)}</span>${ex ? ' ' + badge('已存', 'ok') : ''}<span class="alerts">${ex ? dailyAlerts(d).map(a => badge(a, 'bad')).join(' ') : ''}</span></div>
+      <div class="dgrid"><div class="vit"><label>時間<input type="time" name="${p}time" value="${h(d.time)}"></label>${num('temp', '體溫', '36.5', '0.1')}${num('pulse', '脈搏')}
+        <label>血壓<span class="bp"><input type="number" inputmode="numeric" name="${p}sbp" value="${h(d.sbp)}" placeholder="收縮">/<input type="number" inputmode="numeric" name="${p}dbp" value="${h(d.dbp)}" placeholder="舒張"></span></label>
+        <label class="opt">複測血壓<input type="text" name="${p}bp2" value="${h(d.bp2)}" placeholder="例 11:50 106/58"></label>${num('weight', '體重', '每月', '0.1').replace('<label>', '<label class="opt">')}</div>
+        <div class="sels">${sels}</div><div class="dnote"><input type="text" name="${p}note" value="${h(d.note)}" placeholder="備註／異常（沒事不用填）" list="dailyTpl"></div></div></div>`; }).join('');
+  return layout('DAILY', `<div class="pagehead"><div><h1>今日照顧紀錄</h1><div class="muted">生命徵象＋如廁＋照顧紀錄合併一頁；已依每位長輩「平常的狀況」帶好，只要改有變化的</div></div><span class="sp"></span>
+    <div class="btns"><a class="btn" href="#/daily?date=${addDays(day, -1)}">◀ 前一天</a><input type="date" value="${day}" onchange="App.go('/daily?date='+this.value)"><a class="btn" href="#/daily?date=${addDays(day, 1)}">後一天 ▶</a></div></div>
+    <div class="card fr" style="align-items:center"><div><b>${rocLong(day)}</b>　<span class="muted">在案 ${cs.length} 位・已儲存 ${saved} 位</span></div><span style="flex:1"></span>
+      <div class="btns"><label class="small"><input type="checkbox" id="onlyAlert" onchange="App.dailyFilter(this.checked)"> 只看異常／已修改</label><a class="btn sm" href="#/rec/DAILY">歷史紀錄</a></div></div>
+    <form id="df" onsubmit="return App.saveDaily(event,'${day}')">${cards}<datalist id="dailyTpl">${S.DAILY_NOTE_TPL.map(t => `<option>${t}</option>`).join('')}</datalist>
+    <button class="fab-save" style="display:block" type="submit">💾 儲存全部</button><div class="btns" style="margin:16px 0 80px"><button class="btn pri">💾 儲存全部（${cs.length} 位）</button></div></form>`);
+};
+function dailyCheck(card) {
+  const usual = JSON.parse(card.dataset.usual || '{}'); let changed = false;
+  card.querySelectorAll('select[data-k]').forEach(s => { const diff = usual[s.dataset.k] && s.value !== usual[s.dataset.k]; s.classList.toggle('chg', !!diff); if (diff) changed = true; });
+  const d = {}; card.querySelectorAll('[name]').forEach(e => { d[e.name.replace(/^c\d+_/, '')] = e.value; });
+  card.querySelector('.alerts').innerHTML = dailyAlerts(d).map(a => badge(a, 'bad')).join(' ');
+  const absent = !card.querySelector('.present input').checked; card.classList.toggle('absent', absent);
+  card.dataset.flag = (dailyAlerts(d).length || changed || absent || (d.note || '').trim()) ? '1' : '';
+}
+V.recList = (mod, q) => {
+  const cid = q.client ? +q.client : null; const c = cid ? client(cid) : null; let rows = recs(mod, cid).slice(0, 300);
+  let head, body;
+  if (mod === 'DAILY') { head = '<tr><th>日期</th><th>個案</th><th>體溫</th><th>脈搏</th><th>血壓</th><th>大小便</th><th>精神／情緒</th><th>進食</th><th>備註</th><th>提醒</th></tr>';
+    body = rows.map(r => { const d = r.data, x = client(r.client_id); return `<tr><td>${roc(r.date)}</td><td class="ttl">${h(x.name)}</td>${d.absent ? `<td colspan="7" class="muted">未到中心 ${h(d.note)}</td>` :
+      `<td>${h(d.temp) || '—'}</td><td>${h(d.pulse) || '—'}</td><td>${h(d.sbp) || '—'}/${h(d.dbp) || '—'}</td><td>${h(d.stool)}／${h(d.urine)}</td><td>${h(d.mental)}／${h(d.mood)}</td><td>${h(d.eat_help)} ${h(d.eat_amt)}</td><td class="small wide">${h(d.note)}</td>`}
+      <td>${dailyAlerts(d).map(a => badge(a, 'bad')).join(' ')}</td></tr>`; }).join(''); }
+  else if (mod === 'MNA') { head = '<tr><th>日期</th><th>個案</th><th>BMI</th><th>篩檢分</th><th>合計</th><th>判讀</th><th>營養師建議</th><th></th></tr>';
+    body = rows.map(r => { const s = mnaScore(r.data), x = client(r.client_id); return `<tr><td>${roc(r.date)}</td><td class="ttl">${h(x.name)}</td><td>${s.b ?? '—'}</td><td>${s.s}</td><td>${s.total ?? '—'}</td>
+      <td>${badge(s.level, /良好|正常/.test(s.level) ? 'ok' : 'bad')}</td><td class="small wide">${h(r.data.advice)}</td><td class="btns wide"><a class="btn sm" href="#/r/${r.id}">檢視</a></td></tr>`; }).join(''); }
+  else if (S.SIMPLE[mod]) { const fs = S.SIMPLE[mod].fields.filter(f => f.type !== 'time').slice(0, 5); head = `<tr><th>日期</th><th>個案</th>${fs.map(f => `<th>${f.label}</th>`).join('')}<th></th></tr>`;
+    body = rows.map(r => { const x = client(r.client_id); return `<tr><td>${roc(r.date)}</td><td class="ttl">${h(x.name)}</td>${fs.map(f => { const v = r.data[f.key]; return `<td class="small ${f.type === 'textarea' ? 'wide' : ''}">${h(Array.isArray(v) ? v.join('、') : (v || '').slice(0, 60))}</td>`; }).join('')}
+      <td class="btns wide"><a class="btn sm" href="#/r/${r.id}">檢視</a></td></tr>`; }).join(''); }
+  else { head = '<tr><th>日期</th><th>個案</th><th>對象</th><th>事由</th><th>結論</th><th></th></tr>';
+    body = rows.map(r => { const x = client(r.client_id); return `<tr><td>${roc(r.date)}</td><td class="ttl">${h(x.name)}</td><td>${h((r.data.target || []).join('、'))}</td><td>${h((r.data.items || []).join('、'))}</td>
+      <td class="small wide">${h((r.data.conclusion || '').slice(0, 80))}</td><td class="btns wide"><a class="btn sm" href="#/r/${r.id}">檢視</a><a class="btn sm" href="#/hv/new?client=${r.client_id}">新家訪</a></td></tr>`; }).join(''); }
+  const add = S.SIMPLE[mod] ? `<a class="btn pri" href="#/s/${mod}/new${cid ? '?client=' + cid : ''}">＋ 新增</a>${mod === 'PC' ? '<a class="btn" href="#/s/PC/batch">群組電訪</a>' : ''}` : mod === 'MNA' ? `<a class="btn pri" href="#/nutri/new${cid ? '?client=' + cid : ''}">＋ 營養評估</a>` : mod === 'HV' ? `<a class="btn pri" href="#/hv/new${cid ? '?client=' + cid : ''}">＋ 家訪紀錄</a>` : `<a class="btn pri" href="#/daily">今日照顧紀錄</a>`;
+  return layout(mod, `<div class="pagehead"><div><h1>${MOD_NAME[mod]}</h1><div class="muted">${c ? h(c.label) + '・' : ''}最近 ${rows.length} 筆</div></div><span class="sp"></span><div class="btns">${add}${c ? `<a class="btn" href="#/clients/${cid}">回個案</a>` : ''}</div></div>
+    <div class="tbl-wrap"><table class="t">${head}${body || '<tr><td colspan="10" class="empty">沒有資料</td></tr>'}</table></div>`);
+};
+V.recView = (id) => {
+  const r = DB.records.find(x => x.id === +id); if (!r) return V.notFound(); const c = client(r.client_id); const d = r.data; let body;
+  if (r.module === 'MNA') { const s = mnaScore(d);
+    body = `<div class="grid g2"><div class="card"><h2>結果</h2><dl class="kv"><dt>身高／體重</dt><dd>${h(d.height) || '—'} cm／${h(d.weight) || '—'} kg</dd><dt>BMI</dt><dd>${s.b ?? '—'} ${s.bl}</dd>
+      <dt>篩檢分</dt><dd><b>${s.s}</b> / 14</dd><dt>完整評估</dt><dd>${s.full ?? '未做'}</dd><dt>合計</dt><dd>${s.total ?? '—'}</dd><dt>判讀</dt><dd><b>${s.level}</b></dd></dl></div>
+      <div class="card"><h2>營養師建議</h2><p style="white-space:pre-wrap">${h(d.advice) || '（未填）'}</p></div></div>
+      <div class="card"><h2>作答</h2><table class="t">${S.MNA_SCREEN.concat(S.MNA_FULL).filter(([k]) => d[k]).map(([k, q]) => `<tr><td>${k}. ${h(q)}</td><td><b>${h(Array.isArray(d[k]) ? d[k].join('、') : d[k])}</b></td></tr>`).join('')}</table></div>`; }
+  else if (S.SIMPLE[r.module]) body = `<div class="card"><dl class="kv">${S.SIMPLE[r.module].fields.filter(f => d[f.key]).map(f => `<dt>${f.label}</dt><dd style="white-space:pre-wrap">${h(Array.isArray(d[f.key]) ? d[f.key].join('、') : d[f.key])}</dd>`).join('')}</dl></div>`;
+  else body = `<div class="card"><dl class="kv"><dt>訪視對象</dt><dd>${h((d.target || []).join('、'))} ${h(d.family_member)}</dd><dt>事由</dt><dd>${h((d.items || []).join('、'))}</dd></dl></div>
+    <div class="card">${S.HV_SECTIONS.filter(([k]) => d[k]).map(([k, t]) => `<h3 style="margin-top:10px">${t}</h3><p style="white-space:pre-wrap;margin:4px 0">${h(d[k])}</p>`).join('')}
+    <h3 style="margin-top:10px">參、問題分析</h3><p>${h(hvProblems(d)) || '—'}</p><h3 style="margin-top:10px">肆、結論</h3><p style="white-space:pre-wrap">${h(d.conclusion || hvConclusion(d))}</p></div>`;
+  const edit = S.SIMPLE[r.module] ? `#/s/${r.module}/${r.id}/edit` : r.module === 'MNA' ? `#/nutri/${r.id}/edit` : `#/hv/${r.id}/edit`;
+  return layout(r.module, `<div class="pagehead"><div><h1>${MOD_NAME[r.module]}</h1><div class="muted"><a href="#/clients/${c.id}">${h(c.label)}</a>・${rocLong(r.date)}</div></div><span class="sp"></span>
+    <div class="btns"><a class="btn" href="${edit}">✏️ 編輯</a>${r.module === 'HV' ? `<a class="btn pri" href="#/hv/new?client=${c.id}">＋ 新家訪（沿用本次）</a>` : ''}<button class="btn danger" onclick="App.delRec(${r.id})">刪除</button></div></div>${body}`);
+};
+function recFormBar(mod, c, day, isEdit, route) {
+  return `<div class="formbar"><div class="fr"><div><label class="f">個案</label><select name="client_id" required ${isEdit ? '' : `onchange="App.go('${route}?client='+this.value)"`} style="min-width:200px">
+    <option value="">— 請選擇 —</option>${clientOpts(c && c.id)}</select></div><div><label class="f">日期</label><input type="date" name="date" value="${day}" required></div>
+    <span style="flex:1"></span><div class="btns hide-m"><button class="btn pri">💾 儲存</button></div></div></div>${c ? '<button class="fab-save" type="submit">💾 儲存</button>' : ''}`;
+}
+V.nutriForm = (id, q) => {
+  const r = id ? DB.records.find(x => x.id === +id) : null; const cid = +(q.client || (r && r.client_id) || 0); const c = cid ? client(cid) : null;
+  let d = r ? r.data : {}; if (!r && c) { const last = recs('MNA', cid)[0]; if (last) ['height', 'texture', 'p_staple', 'p_protein', 'p_veg', 'water'].forEach(k => { if (last.data[k]) d[k] = last.data[k]; }); }
+  const qq = ([k, t, o]) => `<div class="mna-q"><div><b>${k}.</b> ${h(t)}</div><div class="pills" style="margin-top:6px">${o === 'protein'
+    ? S.PROTEIN.map(x => `<label class="pill"><input type="checkbox" name="K" value="${h(x)}" ${(d.K || []).includes(x) ? 'checked' : ''}><span>${h(x)}</span></label>`).join('')
+    : o.map(([x, sc]) => `<label class="pill"><input type="radio" name="${k}" value="${h(x)}" ${d[k] === x ? 'checked' : ''}><span>${h(x)} <small>(${sc})</small></span></label>`).join('')}</div></div>`;
+  const sel = (name, opts) => `<select name="${name}">${opts.map(o => `<option ${d[name] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  return layout('MNA', `<div class="pagehead"><div><h1>營養評估（MNA）</h1><div class="muted">BMI、分數、營養師建議句都會自動算；選項與分數沿用中心 care99 的版本</div></div></div>
+  <form id="f" data-kind="mna" onsubmit="return App.saveMNA(event,${id || 0})">${recFormBar('MNA', c, r ? r.date : todayISO(), !!r, '/nutri/new')}
+  ${!c ? '<div class="card empty">請先選擇個案</div>' : `<div class="grid view-grid"><div>
+    <div class="card"><h2>身體測量</h2><div class="fr"><div><label class="f">身高 cm</label><input type="number" step="0.1" inputmode="decimal" name="height" value="${h(d.height)}"></div>
+      <div><label class="f">體重 kg</label><input type="number" step="0.1" inputmode="decimal" name="weight" value="${h(d.weight)}"></div><div><label class="f">BMI（自動）</label><input type="text" id="bmi" readonly style="width:150px;background:#f3f6f5"></div></div></div>
+    <div class="card"><h2>營養篩檢（A–F，滿分 14）</h2>${S.MNA_SCREEN.map(qq).join('')}<div class="mna-q"><b>F.</b> 身體質量指數（BMI）<span class="muted">　依身高體重自動計分</span></div></div>
+    <details class="card box" id="full" ${d.G || d.mac ? 'open' : ''}><summary>完整評估（G–R，篩檢 ≦11 分時建議填寫）</summary>${S.MNA_FULL.map(qq).join('')}
+      <div class="mna-q fr"><div><label class="f">Q. 臂中圍 MAC（cm）</label><input type="number" step="0.1" name="mac" value="${h(d.mac)}"></div><div><label class="f">R. 小腿圍 CC（cm）</label><input type="number" step="0.1" name="cc" value="${h(d.cc)}"></div></div></details>
+    <div class="card"><h2>營養師建議</h2><div class="fr"><div><label class="f">飲食質地</label>${sel('texture', [''].concat(S.DIET_TEXTURE))}</div><div><label class="f">減重</label><label><input type="checkbox" name="reduce" value="1" ${d.reduce ? 'checked' : ''}> 需減重</label></div>
+      <div><label class="f">主食（份）</label>${sel('p_staple', ['', '1', '1.5', '2', '2.5', '3', '3.5', '4'])}</div><div><label class="f">蛋白質（份）</label>${sel('p_protein', ['', '1', '1.5', '2', '2.5', '3'])}</div>
+      <div><label class="f">蔬菜（份）</label>${sel('p_veg', ['', '0.5', '1', '1.5', '2'])}</div><div><label class="f">點心（份）</label>${sel('p_snack', ['', '0.5', '1', '1.5', '2'])}</div><div><label class="f">一日熱量（大卡）</label>${sel('kcal', ['', '1200', '1300', '1400', '1500', '1600', '1700', '1800', '1900', '2000'])}</div>
+      <div><label class="f">蛋白質（g）</label><input type="text" name="protein_g" value="${h(d.protein_g)}" placeholder="例 25-26" style="width:90px"></div>
+      <div><label class="f">日照給水（毫升）</label>${sel('water', ['', '500~600', '700~800', '900~1000', '1000~1100', '1100~1200', '1200~1300'])}</div></div>
+      <div class="btns" style="margin:10px 0 6px"><button type="button" class="btn sm acc" onclick="App.genAdvice()">✨ 產生建議句</button></div><textarea name="advice" id="advice" style="min-height:70px">${h(d.advice)}</textarea></div></div>
+    <div><div class="card score-box sum-box"><div class="muted small">篩檢分（/14）</div><b class="big" id="s_screen">—</b><div class="muted small" style="margin-top:6px">合計（/30）</div><b id="s_total">—</b>
+      <div style="margin-top:8px"><span class="b" id="s_level">—</span></div><div class="small muted" style="margin-top:8px">≧12 正常；≦11 可能營養不良，建議完成完整評估或營養師介入</div></div></div></div>`}</form>`);
+};
+function mnaRefresh() { const f = document.getElementById('f'); if (!f || f.dataset.kind !== 'mna' || !document.getElementById('bmi')) return; const d = recData(f, ['K']); const s = mnaScore(d);
+  document.getElementById('bmi').value = s.b ? `${s.b}（${s.bl}）` : ''; document.getElementById('s_screen').textContent = s.s; document.getElementById('s_total').textContent = s.total ?? '—';
+  const lv = document.getElementById('s_level'); lv.textContent = s.level; lv.className = 'b ' + (/良好|正常/.test(s.level) ? 'ok' : 'bad'); if (s.s <= 11) document.getElementById('full').open = true; }
+V.hvForm = (id, q) => {
+  const r = id ? DB.records.find(x => x.id === +id) : null; const cid = +(q.client || (r && r.client_id) || 0); const c = cid ? client(cid) : null;
+  const last = c ? recs('HV', cid).filter(x => !r || x.id !== r.id)[0] : null; let d = r ? r.data : {};
+  if (!r && last) { d = {}; S.HV_SECTIONS.forEach(([k, , carry]) => { if (carry && last.data[k]) d[k] = last.data[k]; });
+    ['target', 'family_member', 'problems', 'days', 'codes'].concat(S.HV_PROBLEMS.map((_, i) => 'cause_' + i)).forEach(k => { if (last.data[k]) d[k] = last.data[k]; }); }
+  if (c && !d.basic) d.basic = `${c.age ?? ''}歲${{ 男: '男性', 女: '女性' }[c.gender] || ''}，長照福利身分別為${c.identity || '—'}。`;
+  const pills = (name, list, sel) => `<div class="pills">${list.map(t => `<label class="pill"><input type="checkbox" name="${name}" value="${h(t)}" ${(sel || []).includes(t) ? 'checked' : ''}><span>${h(name === 'days' ? '週' + t : t)}</span></label>`).join('')}</div>`;
+  return layout('HV', `<div class="pagehead"><div><h1>社工家訪紀錄</h1><div class="muted">各段自動沿用上次內容，只改有變化的地方；問題分析、結論用勾選自動產生</div></div></div>
+  <form id="f" data-kind="hv" onsubmit="return App.saveHV(event,${id || 0})">${recFormBar('HV', c, r ? r.date : todayISO(), !!r, '/hv/new')}
+  ${!c ? '<div class="card empty">請先選擇個案</div>' : `${last && !r ? `<div class="src">ℹ️ 已帶入上次家訪（${roc(last.date)}）的內容；與上次不同的段落會標成黃色</div>` : ''}
+  <div class="card"><div class="grid g3"><div><label class="f">訪視對象</label>${pills('target', S.HV_TARGETS, d.target)}</div>
+    <div><label class="f">家屬（姓名／關係）</label><input type="text" name="family_member" value="${h(d.family_member)}" style="width:100%"></div><div><label class="f">事由</label>${pills('items', S.HV_ITEMS, d.items)}</div></div></div>
+  <div class="card"><h2>內容</h2>${S.HV_SECTIONS.map(([k, t]) => `<div class="hvsec" data-last="${h(last ? last.data[k] || '' : '')}"><label class="f" style="font-weight:700;color:var(--text)">${t} <span class="hvtag small"></span></label>
+    <textarea name="${k}" style="min-height:${['economy', 'living', 'social'].includes(k) ? 70 : 110}px" placeholder="${k === 'update' ? '本次訪視的新狀況、處遇' : ''}">${h(d[k])}</textarea>
+    ${k === 'economy' ? `<div class="tpl" data-for="economy" data-replace="1">${S.HV_ECONOMY.map(e => `<button type="button" class="tchip">${e}</button>`).join('')}</div>` : ''}</div>`).join('')}</div>
+  <div class="card"><h2>參、問題分析</h2>${S.HV_PROBLEMS.map(([p, causes], i) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0">
+    <label class="pill"><input type="checkbox" name="problems" value="${h(p)}" ${(d.problems || []).includes(p) ? 'checked' : ''}><span>${h(p)}</span></label>
+    <select name="cause_${i}"><option value="">（原因）</option>${causes.map(x => `<option ${d['cause_' + i] === x ? 'selected' : ''}>${h(x)}</option>`).join('')}</select></div>`).join('')}
+    <input type="text" name="problem_other" value="${h(d.problem_other)}" placeholder="其他問題" style="width:100%;margin-top:6px"><div class="small muted" style="margin-top:6px">產生的文字：<span id="ptext"></span></div></div>
+  <div class="card sum-box"><h2>肆、結論</h2><div class="fr"><div><label class="f">服務日</label>${pills('days', S.WEEKDAYS, d.days)}</div><div><label class="f">服務代碼</label>${pills('codes', S.SERVICE_CODES.map(x => x[0]), d.codes)}</div></div>
+    <input type="text" name="concl_extra" value="${h(d.concl_extra)}" placeholder="其他結論" style="width:100%;margin-top:8px"><div class="btns" style="margin:10px 0 6px"><button type="button" class="btn sm acc" onclick="App.genConcl()">✨ 產生結論</button></div>
+    <textarea name="conclusion" id="conclusion" style="min-height:80px">${h(d.conclusion)}</textarea><div class="btns" style="margin-top:12px"><button class="btn pri">💾 儲存家訪紀錄</button></div></div>`}</form>`);
+};
+const HV_LISTS = ['target', 'items', 'problems', 'days', 'codes'];
+function hvRefresh() { const f = document.getElementById('f'); if (!f || f.dataset.kind !== 'hv') return; const d = recData(f, HV_LISTS);
+  const p = document.getElementById('ptext'); if (p) p.textContent = hvProblems(d) || '（未勾選）';
+  document.querySelectorAll('.hvsec').forEach(s => { const last = s.dataset.last, v = s.querySelector('textarea').value.trim(), tag = s.querySelector('.hvtag');
+    if (!last) { tag.textContent = ''; s.classList.remove('chgd'); return; } const same = v === last.trim(); tag.textContent = same ? '（與上次相同）' : '（已更新）'; tag.style.color = same ? '#66756f' : '#b7791f'; s.classList.toggle('chgd', !same); }); }
 
 /* ============================== 列印版面（預覽、PDF、Word 共用） ============================== */
 let PRINT_CSS = '';
@@ -859,6 +1107,29 @@ const App = window.App = {
   backup() { download(`照護評估試用資料_${roc(todayISO(), '')}.json`, new Blob([JSON.stringify(DB)], { type: 'application/json' })); },
   restore(inp) { const file = inp.files[0]; if (!file) return; file.text().then(t => { const d = JSON.parse(t); if (!d.clients) throw 0; DB = d; save(); flash('已載入備份'); route(); }).catch(() => alert('檔案格式不正確')); },
   reset() { if (!confirm('確定重設？您在這個瀏覽器做的所有修改（含意見）都會清除。')) return; localStorage.removeItem(STORE); load(); flash('已重設為初始示範資料'); App.go('/'); },
+  saveDaily(e, day) { e.preventDefault(); let n = 0;
+    activeClients().forEach(c => { const p = `c${c.id}_`; const f = e.target; const get = k => ((f.elements[p + k] || {}).value || '').trim();
+      let d; if (!(f.elements[p + 'present'] || {}).checked) d = { absent: '1', note: get('note') }; else { d = {}; S.DAILY_FIELDS.forEach(([k]) => { const v = get(k); if (v) d[k] = v; }); }
+      Object.keys(d).forEach(k => { if (!d[k]) delete d[k]; });
+      const ex = DB.records.find(r => r.module === 'DAILY' && r.client_id === c.id && r.date === day); saveRec('DAILY', ex ? ex.id : 0, c.id, day, d); n++; });
+    flash(`${roc(day)} 照顧紀錄已儲存（${n} 人）`); route(); return false; },
+  dailyFilter(on) { document.querySelectorAll('.daily').forEach(c => { c.style.display = on && !c.dataset.flag ? 'none' : ''; }); },
+  saveMNA(e, id) { e.preventDefault(); const f = e.target; const cid = +f.client_id.value; if (!cid) { alert('請選擇個案'); return false; }
+    id = saveRec('MNA', id, cid, iso(f.date.value), recData(f, ['K'])); flash('營養評估已儲存'); return App.go('/r/' + id); },
+  genAdvice() { const t = document.getElementById('advice'); if (t.value.trim() && !confirm('取代目前文字？')) return; t.value = mnaAdvice(recData(document.getElementById('f'), ['K'])); dirty = true; },
+  saveHV(e, id) { e.preventDefault(); const f = e.target; const cid = +f.client_id.value; if (!cid) { alert('請選擇個案'); return false; }
+    id = saveRec('HV', id, cid, iso(f.date.value), recData(f, HV_LISTS)); flash('家訪紀錄已儲存'); return App.go('/r/' + id); },
+  genConcl() { const t = document.getElementById('conclusion'); if (t.value.trim() && !confirm('取代目前的結論？')) return; t.value = hvConclusion(recData(document.getElementById('f'), HV_LISTS)); dirty = true; },
+  saveSimple(e, mod, id, batch) { e.preventDefault(); const f = e.target; const lists = S.SIMPLE[mod].fields.filter(x => x.type === 'multi').map(x => x.key);
+    const d = recData(f, lists.concat(['clients'])); const date = iso(f.date.value);
+    if (batch) { const ids = d.clients || []; delete d.clients; Object.keys(d).filter(k => k.startsWith('family_')).forEach(k => delete d[k]);
+      if (!ids.length) { alert('請勾選通知對象'); return false; }
+      ids.forEach(cid => { const x = Object.assign({}, d); const fam = (f.elements['family_' + cid] || {}).value; if (fam) x.family = fam; saveRec('PC', 0, cid, date, x); });
+      flash(`已建立 ${ids.length} 筆電訪紀錄`); return App.go('/rec/PC'); }
+    const cid = +f.client_id.value; if (!cid) { alert('請選擇個案'); return false; } id = saveRec(mod, id, cid, date, d); flash(S.SIMPLE[mod].title + '已儲存'); return App.go('/r/' + id); },
+  autoGen(k, kind) { const f = document.getElementById('f'); const cid = +f.client_id.value; const t = document.getElementById('ta_' + k); if (!cid) return;
+    if (t.value.trim() && !confirm('用自動產生的內容取代？')) return; t.value = kind === 'month_summary' ? monthSummary(cid, (f.elements.month || {}).value || todayISO().slice(0, 7)) : kind === 'adapt_summary' ? adaptSummary(recData(f, []), cid) : closureStats(cid); dirty = true; },
+  delRec(id) { if (!confirm('確定刪除這筆紀錄？')) return; const r = DB.records.find(x => x.id === id); DB.records = DB.records.filter(x => x.id !== id); save(); flash('已刪除'); App.go('/rec/' + r.module); },
   preview(kind, id) { const w = window.open('', '_blank'); if (!w) { alert('請允許此網站開啟新視窗'); return; } w.document.open(); w.document.write(fullHTML(printDoc(kind, id), true)); w.document.close(); },
   word(kind, id) { const d = printDoc(kind, id); download(d.title + '.doc', wordBlob(d)); },
   async excel(e) { e.preventDefault(); const f = fd2obj(e.target); try { await loadScript(XLSX_URL); } catch (err) { alert(err.message); return false; }
@@ -901,6 +1172,12 @@ function route() {
     html = !p[2] ? V.assessList(p[1], q) : (p[2] === 'new' ? form(0, q) : form(+p[2], q));
   }
   else if (p[0] === 'a') html = V.assessView(+p[1]);
+  else if (p[0] === 'daily') html = V.daily(q);
+  else if (p[0] === 'rec' && ALL_MODS.includes(p[1])) html = V.recList(p[1], q);
+  else if (p[0] === 'r') html = V.recView(+p[1]);
+  else if (p[0] === 'nutri') html = p[1] === 'new' ? V.nutriForm(0, q) : V.nutriForm(+p[1], q);
+  else if (p[0] === 's' && S.SIMPLE[p[1]]) html = p[2] === 'batch' ? V.simpleForm('PC', 0, q, true) : (p[2] === 'new' ? V.simpleForm(p[1], 0, q) : V.simpleForm(p[1], +p[2], q));
+  else if (p[0] === 'hv') html = p[1] === 'new' ? V.hvForm(0, q) : V.hvForm(+p[1], q);
   else if (p[0] === 'aids') html = V.aids(q);
   else if (p[0] === 'goals') html = p[1] === 'from' ? V.goalsFrom(+p[2]) : V.goals(q);
   else if (p[0] === 'reports') html = V.reports();
@@ -909,7 +1186,9 @@ function route() {
   else html = V.notFound();
   root.innerHTML = html; cardify(root); window.scrollTo(0, 0); dirty = false;
   const f = document.getElementById('f');
-  if (f) { f.addEventListener('input', () => { dirty = true; }); f.addEventListener('change', () => { markPrev(); refreshIcope(); }); markPrev(); refreshIcope(); }
+  if (f) { f.addEventListener('input', () => { dirty = true; mnaRefresh(); hvRefresh(); }); f.addEventListener('change', () => { markPrev(); refreshIcope(); mnaRefresh(); hvRefresh(); }); markPrev(); refreshIcope(); mnaRefresh(); hvRefresh(); }
+  const df = document.getElementById('df');
+  if (df) { const h2 = e => { dirty = true; const c = e.target.closest('.daily'); if (c) dailyCheck(c); }; df.addEventListener('input', h2); df.addEventListener('change', h2); df.querySelectorAll('.daily').forEach(dailyCheck); }
   const pv = document.getElementById('pv'); if (pv) { const go = () => { pv.srcdoc = fullHTML(printDoc('a', +p[1]), true); }; PRINT_CSS ? go() : setTimeout(go, 400); }
   document.title = (document.querySelector('main h1') || {}).textContent?.trim() + '｜照護評估系統（試用版）';
 }
@@ -918,6 +1197,10 @@ window.addEventListener('hashchange', () => {
   if (dirty && !confirm('這頁有尚未儲存的修改，確定要離開嗎？')) { history.replaceState(null, '', lastHash || '#/'); return; }
   lastHash = location.hash; route();
 });
+document.addEventListener('click', e => { const b = e.target.closest('.tchip'); if (!b) return;
+  const inp = document.querySelector(`[name="${b.parentElement.dataset.for}"]`); if (!inp) return;
+  const t = b.textContent.trim(); if (b.parentElement.dataset.replace) inp.value = t; else if (!inp.value.includes(t)) inp.value = inp.value ? inp.value + (b.parentElement.dataset.nosep ? '' : '；') + t : t;
+  dirty = true; hvRefresh(); });
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 load(); route();
 })();

@@ -30,6 +30,16 @@
   <div class="grp">照顧評估</div>
   <a href="{{ url_for('assess_list', typ='d61') }}" class="{{ 'on' if typ=='d61' or (ep=='assess_view' and a and a.type=='D61') }}"><code>D61</code><span>職能治療評估</span></a>
   <a href="{{ url_for('assess_list', typ='icope') }}" class="{{ 'on' if typ=='icope' or (ep=='assess_view' and a and a.type=='ICOPE') }}"><code>六力</code><span>ICOPE 評估</span></a>
+  <div class="grp">照顧與跨專業</div>
+  <a href="{{ url_for('daily') }}" class="{{ 'on' if ep=='daily' }}"><code>照服</code><span>今日照顧紀錄</span></a>
+  <a href="{{ url_for('records_list', module='MNA') }}" class="{{ 'on' if ep in ('nutri_form',) or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='MNA') }}"><code>營養</code><span>營養評估</span></a>
+  <a href="{{ url_for('records_list', module='HV') }}" class="{{ 'on' if ep=='hv_form' or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='HV') }}"><code>社工</code><span>家訪紀錄</span></a>
+  <a href="{{ url_for('records_list', module='PC') }}" class="{{ 'on' if (ep in ('simple_form','pc_batch') and (request.view_args or {}).get('mod','PC')=='PC') or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='PC') }}"><code>社工</code><span>電訪紀錄</span></a>
+  <a href="{{ url_for('records_list', module='IR') }}" class="{{ 'on' if (ep=='simple_form' and (request.view_args or {}).get('mod')=='IR') or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='IR') }}"><code>⚠️</code><span>異常事件</span></a>
+  <a href="{{ url_for('records_list', module='MS') }}" class="{{ 'on' if (ep=='simple_form' and (request.view_args or {}).get('mod')=='MS') or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='MS') }}"><code>社工</code><span>月照顧摘要</span></a>
+  <a href="{{ url_for('records_list', module='CL') }}" class="{{ 'on' if (ep=='simple_form' and (request.view_args or {}).get('mod')=='CL') or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='CL') }}"><code>社工</code><span>結案紀錄</span></a>
+  <a href="{{ url_for('records_list', module='EA') }}" class="{{ 'on' if (ep=='simple_form' and (request.view_args or {}).get('mod')=='EA') or (ep in ('records_list','record_view') and (request.view_args or {}).get('module')=='EA') }}"><code>適應</code><span>環境適應評估</span></a>
+  <a href="{{ url_for('records_index') }}" class="{{ 'on' if ep=='records_index' or (ep in ('records_list','record_view') and (request.view_args or {}).get('module') not in ('MNA','HV','PC','IR','MS','CL','EA')) }}"><code>📁</code><span>care99 歷史紀錄</span></a>
   <div class="grp">自立支援</div>
   <a href="{{ url_for('goals') }}" class="{{ 'on' if ep in ('goals','goals_from_icope') }}"><code>B10</code><span>復能目標追蹤</span></a>
   <div class="grp">評鑑與報表</div>
@@ -50,7 +60,7 @@
   <a href="{{ url_for('home') }}" class="{{ 'on' if ep=='home' }}"><b>🏠</b>首頁</a>
   <a href="{{ url_for('clients') }}" class="{{ 'on' if ep in ('clients','client_view','client_edit') }}"><b>👥</b>個案</a>
   <a href="{{ url_for('assess_list', typ='icope') }}" class="{{ 'on' if typ=='icope' }}"><b>🧭</b>六力</a>
-  <a href="{{ url_for('assess_list', typ='d61') }}" class="{{ 'on' if typ=='d61' }}"><b>📝</b>D61</a>
+  <a href="{{ url_for('daily') }}" class="{{ 'on' if ep=='daily' }}"><b>📋</b>照顧</a>
   <a href="#" onclick="document.body.classList.add('nav-open');return false"><b>☰</b>更多</a>
 </nav>
 <script>

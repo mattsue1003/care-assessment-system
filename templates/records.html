@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>{{ title }}</h1><div class="muted">{% if client %}{{ client.label }}・{% endif %}最近 {{ rows|length }} 筆{% if module not in ('DAILY','MNA') %}・從 care99 匯入{% endif %}</div></div>
+<span class="sp"></span>
+<div class="btns">{% if module=='MNA' %}<a class="btn pri" href="{{ url_for('nutri_form', client=client.id if client else None) }}">＋ 營養評估</a>{% endif %}
+{% if module in M.SIMPLE %}<a class="btn pri" href="{{ url_for('simple_form', mod=module, client=client.id if client else None) }}">＋ 新增</a>{% if module=='PC' %}<a class="btn" href="{{ url_for('pc_batch') }}">群組電訪</a>{% endif %}{% endif %}
+{% if module=='HV' %}<a class="btn pri" href="{{ url_for('hv_form', client=client.id if client else None) }}">＋ 家訪紀錄</a>{% endif %}
+{% if module=='DAILY' %}<a class="btn pri" href="{{ url_for('daily') }}">今日照顧紀錄</a>{% endif %}
+{% if client %}<a class="btn" href="{{ url_for('client_view', cid=client.id) }}">回個案</a>{% endif %}</div></div>
+<form class="card fr" method="get">{% if client %}<input type="hidden" name="client" value="{{ client.id }}">{% endif %}
+  <div><label class="f">日期</label><span><input type="date" name="from" value="{{ f }}"> 至 <input type="date" name="to" value="{{ t }}"></span></div>
+  <div class="btns"><button class="btn pri">查詢</button></div></form>
+<div class="tbl-wrap"><table class="t">
+{% if module == 'DAILY' %}
+<tr><th>日期</th><th>個案</th><th>體溫</th><th>脈搏</th><th>血壓</th><th>大小便</th><th>精神／情緒</th><th>進食</th><th>飲水</th><th>備註</th><th>提醒</th></tr>
+{% for r in rows %}{% set d = r.data %}<tr><td>{{ r.date|roc }}</td><td class="ttl">{{ r.name }} <span class="muted small">{{ r.case_no }}</span></td>
+  {% if d.absent %}<td colspan="8" class="muted">未到中心 {{ d.note or '' }}</td>{% else %}
+  <td>{{ d.temp or '—' }}</td><td>{{ d.pulse or '—' }}</td><td>{{ d.sbp or '—' }}/{{ d.dbp or '—' }}</td><td>{{ d.stool or '' }}／{{ d.urine or '' }}</td>
+  <td>{{ d.mental or '' }}／{{ d.mood or '' }}</td><td>{{ d.eat_help or '' }} {{ d.eat_amt or '' }}</td><td>{{ d.water_amt or '' }}</td><td class="small wide">{{ d.note or '' }}{{ ('；' ~ d.bp2) if d.bp2 }}</td>{% endif %}
+  <td>{% for a in r.alerts %}<span class="b bad">{{ a }}</span> {% endfor %}</td></tr>{% else %}<tr><td colspan="11" class="empty">沒有資料</td></tr>{% endfor %}
+{% elif module in M.SIMPLE %}
+<tr><th>日期</th><th>個案</th>{% for f in M.SIMPLE[module].fields[:6] if f.type != 'time' %}<th>{{ f.label }}</th>{% endfor %}<th></th></tr>
+{% for r in rows %}<tr><td>{{ r.date|roc }}</td><td class="ttl">{{ r.name }} <span class="muted small">{{ r.case_no }}</span></td>
+  {% for f in M.SIMPLE[module].fields[:6] if f.type != 'time' %}{% set v = r.data.get(f.key) %}<td class="small {{ 'wide' if f.type=='textarea' }}">{{ (v|join('、') if v is not string else v[:60]) if v else '' }}</td>{% endfor %}
+  <td class="btns wide"><a class="btn sm" href="{{ url_for('record_view', module=module, rid=r.id) }}">檢視</a></td></tr>{% else %}<tr><td colspan="9" class="empty">沒有資料</td></tr>{% endfor %}
+{% elif module == 'HV' %}
+<tr><th>日期</th><th>個案</th><th>對象</th><th>事由</th><th>社工</th><th>結論</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.date|roc }}</td><td class="ttl">{{ r.name }} <span class="muted small">{{ r.case_no }}</span></td><td>{{ (r.data.target or [])|join('、') }}</td>
+  <td>{{ (r.data.get('items') or [])|join('、') or r.data.item_text or '' }}</td><td>{{ r.staff }}</td><td class="small wide">{{ (r.data.conclusion or '')[:80] }}</td>
+  <td class="btns wide"><a class="btn sm" href="{{ url_for('record_view', module='HV', rid=r.id) }}">檢視</a><a class="btn sm" href="{{ url_for('hv_form', client=r.client_id) }}">新家訪</a></td></tr>{% else %}<tr><td colspan="7" class="empty">沒有資料</td></tr>{% endfor %}
+{% elif module == 'MNA' %}
+<tr><th>日期</th><th>個案</th><th>BMI</th><th>篩檢分</th><th>合計</th><th>判讀</th><th>營養師建議</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.date|roc }}</td><td class="ttl">{{ r.name }} <span class="muted small">{{ r.case_no }}</span></td>
+  <td>{{ r.score[3] or '—' }}</td><td>{{ r.score[0] }}</td><td>{{ r.score[2] if r.score[2] is not none else '—' }}</td>
+  <td><span class="b {{ 'ok' if '良好' in r.score[5] or '正常' in r.score[5] else 'bad' }}">{{ r.score[5] }}</span></td><td class="small wide">{{ r.data.advice or '' }}</td>
+  <td class="btns wide"><a class="btn sm" href="{{ url_for('record_view', module='MNA', rid=r.id) }}">檢視</a></td></tr>{% else %}<tr><td colspan="8" class="empty">沒有資料</td></tr>{% endfor %}
+{% else %}
+<tr><th>日期</th><th>個案</th>{% for k in cols %}<th>{{ k }}</th>{% endfor %}<th></th></tr>
+{% for r in rows %}<tr><td>{{ r.date|roc }}</td><td class="ttl">{{ r.name or '—' }} <span class="muted small">{{ r.case_no or '' }}</span></td>
+  {% for k in cols %}<td class="small">{{ (r.data.get(k) or '')[:60] }}</td>{% endfor %}
+  <td class="btns wide">{% if r.data._detail %}<a class="btn sm" href="{{ url_for('record_view', module=module, rid=r.id) }}">明細</a>{% endif %}</td></tr>
+{% else %}<tr><td colspan="{{ cols|length + 3 }}" class="empty">沒有資料</td></tr>{% endfor %}
+{% endif %}
+</table></div>
+{% endblock %}

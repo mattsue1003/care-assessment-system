@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% macro q(k, text, opts) -%}
+<div class="mna-q"><div><b>{{ k }}.</b> {{ text }}</div>
+  {% if opts == 'protein' %}<div class="pills" style="margin-top:6px">{% for o in M.PROTEIN %}<label class="pill"><input type="checkbox" name="K" value="{{ o }}" {{ 'checked' if o in (data.get('K') or []) }}><span>{{ o }}</span></label>{% endfor %}</div>
+  {% else %}<div class="pills" style="margin-top:6px">{% for o, sc in opts %}<label class="pill"><input type="radio" name="{{ k }}" value="{{ o }}" {{ 'checked' if data.get(k)==o }}><span>{{ o }} <small>({{ sc }})</small></span></label>{% endfor %}</div>{% endif %}
+</div>
+{%- endmacro %}
+{% block body %}
+<div class="pagehead"><div><h1>營養評估（MNA）{{ '（編輯）' if r else '' }}</h1>
+<div class="muted">BMI、分數、營養師建議句都會自動算；選項與分數沿用中心 care99 的版本</div></div></div>
+<form method="post" id="f" action="{{ url_for('nutri_save', rid=r.id) if r else url_for('nutri_save') }}">
+<div class="formbar"><div class="fr">
+  <div><label class="f">評估對象</label><select name="client_id" required {% if not r %}onchange="location.href='?client='+this.value"{% endif %} style="min-width:200px">
+    <option value="">— 請選擇 —</option>{% for x in cs %}<option value="{{ x.id }}" {{ 'selected' if c and x.id==c.id }}>{{ x.label }}</option>{% endfor %}</select></div>
+  <div><label class="f">評估日期</label><input type="date" name="date" value="{{ day }}" required></div>
+  <span style="flex:1"></span><div class="btns hide-m"><button class="btn pri">💾 儲存</button></div></div></div>
+{% if c %}<button class="fab-save" type="submit">💾 儲存</button>{% endif %}
+<div class="grid view-grid">
+<div>
+  <div class="card"><h2>身體測量</h2><div class="fr">
+    <div><label class="f">身高 cm</label><input type="number" step="0.1" inputmode="decimal" name="height" value="{{ data.height or '' }}"></div>
+    <div><label class="f">體重 kg</label><input type="number" step="0.1" inputmode="decimal" name="weight" value="{{ data.weight or '' }}"></div>
+    <div><label class="f">BMI（自動）</label><input type="text" id="bmi" readonly style="width:150px;background:#f3f6f5"></div></div></div>
+  <div class="card"><h2>營養篩檢（A–F，滿分 14）</h2>{% for k, t, o in M.MNA_SCREEN %}{{ q(k, t, o) }}{% endfor %}
+    <div class="mna-q"><b>F.</b> 身體質量指數（BMI）　<span class="muted">依身高體重自動計分</span></div></div>
+  <details class="card box" id="full" {{ 'open' if data.get('G') or data.get('mac') }}><summary>完整評估（G–R，篩檢 ≦11 分時建議填寫）</summary>
+    {% for k, t, o in M.MNA_FULL %}{{ q(k, t, o) }}{% endfor %}
+    <div class="mna-q fr"><div><label class="f">Q. 臂中圍 MAC（cm）</label><input type="number" step="0.1" name="mac" value="{{ data.mac or '' }}"></div>
+      <div><label class="f">R. 小腿圍 CC（cm）</label><input type="number" step="0.1" name="cc" value="{{ data.cc or '' }}"></div></div></details>
+  <div class="card"><h2>營養師建議</h2><div class="fr">
+    <div><label class="f">飲食質地</label><select name="texture"><option value=""></option>{% for t in M.DIET_TEXTURE %}<option {{ 'selected' if data.texture==t }}>{{ t }}</option>{% endfor %}</select></div>
+    <div><label class="f">減重</label><label><input type="checkbox" name="reduce" value="1" {{ 'checked' if data.reduce }}> 需減重</label></div>
+    <div><label class="f">主食（份）</label><select name="p_staple">{% for n in ['', '1', '1.5', '2', '2.5', '3', '3.5', '4'] %}<option {{ 'selected' if data.p_staple==n }}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="f">蛋白質（份）</label><select name="p_protein">{% for n in ['', '1', '1.5', '2', '2.5', '3'] %}<option {{ 'selected' if data.p_protein==n }}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="f">蔬菜（份）</label><select name="p_veg">{% for n in ['', '0.5', '1', '1.5', '2'] %}<option {{ 'selected' if data.p_veg==n }}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="f">點心（份）</label><select name="p_snack">{% for n in ['', '0.5', '1', '1.5', '2'] %}<option {{ 'selected' if data.p_snack==n }}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="f">一日熱量（大卡）</label><select name="kcal">{% for n in ['', '1200', '1300', '1400', '1500', '1600', '1700', '1800', '1900', '2000'] %}<option {{ 'selected' if data.kcal==n }}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="f">蛋白質（g）</label><input type="text" name="protein_g" value="{{ data.protein_g or '' }}" placeholder="例 25-26" style="width:90px"></div>
+    <div><label class="f">日照給水（毫升）</label><select name="water">{% for n in ['', '500~600', '700~800', '900~1000', '1000~1100', '1100~1200', '1200~1300'] %}<option {{ 'selected' if data.water==n }}>{{ n }}</option>{% endfor %}</select></div></div>
+    <div class="btns" style="margin:10px 0 6px"><button type="button" class="btn sm acc" onclick="genAdvice()">✨ 產生建議句</button></div>
+    <textarea name="advice" id="advice" style="min-height:70px">{{ data.advice or '' }}</textarea>
+    <label class="f" style="margin-top:8px">備註</label><input type="text" name="note" value="{{ data.note or '' }}" style="width:100%"></div>
+</div>
+<div><div class="card score-box sum-box"><div class="muted small">篩檢分（/14）</div><b class="big" id="s_screen">—</b>
+  <div class="muted small" style="margin-top:6px">合計（/30）</div><b id="s_total">—</b>
+  <div style="margin-top:8px"><span class="b" id="s_level">—</span></div>
+  <div class="small muted" style="margin-top:8px">≧12 正常；≦11 可能營養不良，建議完成完整評估或營養師介入</div></div></div>
+</div>
+</form>
+{% endblock %}
+{% block script %}
+<script>
+const f = document.getElementById('f'); let last = {};
+async function calc() { const r = await fetch('{{ url_for("api_mna") }}', {method: 'POST', body: new FormData(f)}); last = await r.json();
+  document.getElementById('bmi').value = last.bmi ? `${last.bmi}（${last.bmi_label}）` : '';
+  document.getElementById('s_screen').textContent = last.screen; document.getElementById('s_total').textContent = last.total ?? '—';
+  const lv = document.getElementById('s_level'); lv.textContent = last.level; lv.className = 'b ' + (/良好|正常/.test(last.level) ? 'ok' : 'bad');
+  if (last.screen <= 11 && !document.getElementById('full').open) document.getElementById('full').open = true; }
+function genAdvice() { const t = document.getElementById('advice'); if (t.value.trim() && !confirm('取代目前文字？')) return; t.value = last.advice || ''; }
+f.addEventListener('change', calc); f.addEventListener('input', e => { if (['height', 'weight', 'mac', 'cc'].includes(e.target.name)) calc(); }); calc();
+</script>
+{% endblock %}

@@ -73,6 +73,14 @@
 </div>
 {% endif %}
 
+{% if recsum %}<div class="card">
+  <h2>跨專業紀錄</h2>
+  <div class="btns" style="margin-bottom:8px"><a class="btn sm pri" href="{{ url_for('nutri_form', client=c.id) }}">＋ 營養評估</a><a class="btn sm pri" href="{{ url_for('hv_form', client=c.id) }}">＋ 家訪紀錄</a><a class="btn sm" href="{{ url_for('simple_form', mod='PC', client=c.id) }}">＋ 電訪</a><a class="btn sm" href="{{ url_for('simple_form', mod='IR', client=c.id) }}">＋ 異常事件</a><a class="btn sm" href="{{ url_for('daily') }}">今日照顧紀錄</a></div>
+  <div class="tbl-wrap"><table class="t"><tr><th>紀錄</th><th>筆數</th><th>最近</th><th></th></tr>
+  {% for m in recsum %}<tr><td class="ttl">{{ m.name }}</td><td>{{ m.n }}</td><td>{{ m.last|roc }}</td><td class="btns wide"><a class="btn sm" href="{{ url_for('records_list', module=m.module, client=c.id) }}">查看</a></td></tr>{% endfor %}
+  </table></div>
+</div>{% endif %}
+
 <div class="card">
   <h2>B9 輔具使用</h2>
   {% if aids %}<div class="tbl-wrap"><table class="t">

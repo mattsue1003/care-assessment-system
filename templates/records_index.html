@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>care99 歷史紀錄</h1><div class="muted">從 care99 搬過來的護理、社工、照服、營養等紀錄（只存在本機）</div></div></div>
+<div class="tbl-wrap"><table class="t"><tr><th>模組</th><th>筆數</th><th>期間</th><th></th></tr>
+{% for m in mods %}<tr><td class="ttl"><b>{{ m.name }}</b> <span class="muted small">{{ m.module }}</span></td><td>{{ m.n }}</td><td>{{ m.first|roc }} ～ {{ m.last|roc }}</td>
+<td class="btns wide"><a class="btn sm" href="{{ url_for('records_list', module=m.module) }}">查看</a></td></tr>
+{% else %}<tr><td colspan="4" class="empty">尚未匯入。請執行 import_care99.py</td></tr>{% endfor %}</table></div>
+{% endblock %}

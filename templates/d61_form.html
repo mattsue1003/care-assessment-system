@@ -27,14 +27,17 @@
       <div class="lb">{{ f.label }}{% if f.hint %}<div class="hint">{{ f.hint }}</div>{% endif %}</div>
       <div>
       {% if f.type == 'multi' %}
-        <div class="pills">{% for o in f.options %}<label class="pill {{ 'bad' if f.key in ('adl_help','bpsd') }}"><input type="checkbox" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v and o in v }}><span>{{ o }}</span></label>{% endfor %}</div>
+        <div class="pills">{% for o in f.options %}<label class="pill {{ 'bad' if f.key in ('adl_help','bpsd') }}"><input type="checkbox" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v and o in v }}><span>{{ o }}{% if o in S.EXTRA_OPTS %}<sup class="new" title="依過去紀錄新增；care99 請寫在「其他」">新</sup>{% endif %}</span></label>{% endfor %}</div>
         {% if f.other %}<input type="text" class="other" name="{{ f.key }}_other" value="{{ data.get(f.key+'_other','') }}" placeholder="其他：">{% endif %}
+        {% with tg=f.key+'_other' %}{% include "_tpl.html" %}{% endwith %}
         {% if pv %}<div class="small muted" style="margin-top:4px">上次：{{ pv|join('、') }}</div>{% endif %}
       {% elif f.type == 'radio' %}
         <div class="pills" data-prev="{{ pv or '' }}">{% for o in f.options %}<label class="pill {{ 'bad' if not loop.first }}"><input type="radio" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v==o }}><span>{{ o }}</span></label>{% endfor %}</div>
-        {% if f.note %}<input type="text" class="note-in" name="{{ f.key }}_note" value="{{ data.get(f.key+'_note','') }}" placeholder="備註部位／說明">{% endif %}
+        {% if f.note %}<input type="text" class="note-in" name="{{ f.key }}_note" value="{{ data.get(f.key+'_note','') }}" placeholder="備註">{% endif %}
+        {% with tg=f.key+'_note' %}{% include "_tpl.html" %}{% endwith %}
       {% else %}
-        <input type="text" name="{{ f.key }}" value="{{ v or '' }}" style="width:100%" placeholder="{{ '例：參加體適能運動、團體認知活動' if f.key=='sched_am' else '' }}">
+        <input type="text" name="{{ f.key }}" value="{{ v or '' }}" style="width:100%">
+        {% with tg=f.key %}{% include "_tpl.html" %}{% endwith %}
       {% endif %}
       </div>
       {% if f.type=='radio' %}<div class="prev">{% if pv %}上次：{{ pv }}{% endif %}</div>{% endif %}
@@ -77,6 +80,10 @@ function markPrev(){
   });
 }
 document.addEventListener('change', markPrev); markPrev();
+document.addEventListener('click', e => { const b = e.target.closest('.tchip'); if (!b) return;
+  const inp = document.querySelector(`[name="${b.parentElement.dataset.for}"]`); if (!inp) return;
+  const t = b.textContent.trim(); if (!inp.value.includes(t)) inp.value = inp.value ? inp.value + '；' + t : t;
+  inp.dispatchEvent(new Event('input', {bubbles: true})); });
 async function genNarr(){
   const fd=new FormData(document.getElementById('f'));
   if(document.getElementById('with_icope')?.checked) fd.append('with_icope','1');

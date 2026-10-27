@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>社工家訪紀錄{{ '（編輯）' if r else '' }}</h1>
+<div class="muted">各段自動沿用上次內容，只改有變化的地方；問題分析、結論用勾選自動產生</div></div></div>
+<form method="post" id="f" action="{{ url_for('hv_save', rid=r.id) if r else url_for('hv_save') }}">
+<div class="formbar"><div class="fr">
+  <div><label class="f">個案</label><select name="client_id" required {% if not r %}onchange="location.href='?client='+this.value"{% endif %} style="min-width:200px">
+    <option value="">— 請選擇 —</option>{% for x in cs %}<option value="{{ x.id }}" {{ 'selected' if c and x.id==c.id }}>{{ x.label }}</option>{% endfor %}</select></div>
+  <div><label class="f">訪視日期</label><input type="date" name="date" value="{{ day }}" required></div>
+  <span style="flex:1"></span><div class="btns hide-m"><button class="btn pri">💾 儲存</button></div></div></div>
+{% if c %}<button class="fab-save" type="submit">💾 儲存</button>
+{% if last and not r %}<div class="src">ℹ️ 已帶入上次家訪（{{ last.date|roc }}）的內容；與上次不同的段落會標成黃色</div>{% endif %}
+
+<div class="card"><div class="grid g3">
+  <div><label class="f">訪視對象</label><div class="pills">{% for t in M.HV_TARGETS %}<label class="pill"><input type="checkbox" name="target" value="{{ t }}" {{ 'checked' if t in (data.target or []) }}><span>{{ t }}</span></label>{% endfor %}</div></div>
+  <div><label class="f">家屬（姓名／關係）</label><input type="text" name="family_member" value="{{ data.family_member or '' }}" style="width:100%"></div>
+  <div><label class="f">事由</label><div class="pills">{% for t in M.HV_ITEMS %}<label class="pill"><input type="checkbox" name="items" value="{{ t }}" {{ 'checked' if t in (data.get('items') or []) }}><span>{{ t }}</span></label>{% endfor %}</div></div>
+</div></div>
+
+<div class="card"><h2>內容</h2>
+{% for k, title, carry in M.HV_SECTIONS %}
+  <div class="hvsec" data-last="{{ (last.data.get(k) if last else '') or '' }}">
+    <label class="f" style="font-weight:700;color:var(--text)">{{ title }} <span class="hvtag small"></span></label>
+    <textarea name="{{ k }}" style="min-height:{{ 70 if k in ('economy','living','social') else 110 }}px" placeholder="{{ '本次訪視的新狀況、處遇（例：家屬反映…、討論後調整為…）' if k=='update' else '' }}">{{ data.get(k) or (data._basic_suggest if k=='basic' else '') }}</textarea>
+    {% if k=='economy' %}<div class="tpl" data-for="economy">{% for e in M.HV_ECONOMY %}<button type="button" class="tchip">{{ e }}</button>{% endfor %}</div>{% endif %}
+  </div>
+{% endfor %}
+</div>
+
+<div class="card"><h2>參、問題分析</h2>
+{% for p, causes in M.HV_PROBLEMS %}{% set i = loop.index0 %}
+  <div class="q" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0">
+    <label class="pill"><input type="checkbox" name="problems" value="{{ p }}" {{ 'checked' if p in (data.problems or []) }}><span>{{ p }}</span></label>
+    <select name="cause_{{ i }}"><option value="">（原因）</option>{% for x in causes %}<option {{ 'selected' if data.get('cause_' ~ i)==x }}>{{ x }}</option>{% endfor %}</select>
+  </div>{% endfor %}
+  <input type="text" name="problem_other" value="{{ data.problem_other or '' }}" placeholder="其他問題" style="width:100%;margin-top:6px">
+  <div class="small muted" style="margin-top:6px">產生的文字：<span id="ptext"></span></div>
+</div>
+
+<div class="card sum-box"><h2>肆、結論</h2>
+  <div class="fr"><div><label class="f">服務日</label><div class="pills">{% for d in M.WEEKDAYS %}<label class="pill"><input type="checkbox" name="days" value="{{ d }}" {{ 'checked' if d in (data.days or []) }}><span>週{{ d }}</span></label>{% endfor %}</div></div>
+  <div><label class="f">服務代碼</label><div class="pills">{% for code, name in M.SERVICE_CODES %}<label class="pill"><input type="checkbox" name="codes" value="{{ code }}" {{ 'checked' if code in (data.codes or []) }}><span>{{ code }}</span></label>{% endfor %}</div></div></div>
+  <input type="text" name="concl_extra" value="{{ data.concl_extra or '' }}" placeholder="其他結論（例：建議家屬…）" style="width:100%;margin-top:8px">
+  <div class="btns" style="margin:10px 0 6px"><button type="button" class="btn sm acc" onclick="genConcl()">✨ 產生結論</button></div>
+  <textarea name="conclusion" id="conclusion" style="min-height:80px">{{ data.conclusion or '' }}</textarea>
+  <div class="btns" style="margin-top:12px"><button class="btn pri">💾 儲存家訪紀錄</button></div>
+</div>
+{% else %}<div class="card empty">請先選擇個案</div>{% endif %}
+</form>
+{% endblock %}
+{% block script %}
+<script>
+const f = document.getElementById('f');
+function mark() { document.querySelectorAll('.hvsec').forEach(s => { const last = s.dataset.last, v = s.querySelector('textarea').value.trim(), tag = s.querySelector('.hvtag');
+  if (!last) { tag.textContent = ''; s.classList.remove('chgd'); return; }
+  const same = v === last.trim(); tag.textContent = same ? '（與上次相同）' : '（已更新）'; tag.style.color = same ? '#66756f' : '#b7791f'; s.classList.toggle('chgd', !same); }); }
+async function api() { const r = await fetch('{{ url_for("api_hv") }}', {method: 'POST', body: new FormData(f)}); return r.json(); }
+async function genConcl() { const j = await api(); const t = document.getElementById('conclusion'); if (t.value.trim() && !confirm('取代目前的結論？')) return; t.value = j.conclusion; }
+async function refresh() { const j = await api(); const p = document.getElementById('ptext'); if (p) p.textContent = j.problems || '（未勾選）'; mark(); }
+if (f) { f.addEventListener('change', refresh); f.addEventListener('input', mark); refresh(); }
+document.addEventListener('click', e => { const b = e.target.closest('.tchip'); if (!b) return; const inp = document.querySelector(`[name="${b.parentElement.dataset.for}"]`);
+  if (inp) { inp.value = b.textContent.trim(); mark(); } });
+</script>
+{% endblock %}
