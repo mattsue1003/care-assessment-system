@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}福喜緣照護評估系統{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+{% set ep = request.endpoint %}
+{% set typ = (request.view_args or {}).get('typ', '')|lower %}
+<div class="top">
+  <div class="logo"><i>福</i>照護評估系統</div>
+  <span class="small">單位：{{ center }}</span>
+  <span class="sp"></span>
+  <span class="small">用戶：{{ me.name }}{% if me.title %}（{{ me.title }}）{% endif %}</span>
+  <a class="small" href="{{ url_for('logout') }}">登出</a>
+</div>
+<div class="wrap">
+<nav class="side">
+  <a href="{{ url_for('home') }}" class="{{ 'on' if ep=='home' }}">🏠 <span>首頁／待辦</span></a>
+  <div class="grp">基本資料</div>
+  <a href="{{ url_for('clients') }}" class="{{ 'on' if ep in ('clients','client_view','client_edit') }}"><code>B2</code><span>個案名冊</span></a>
+  <a href="{{ url_for('aids') }}" class="{{ 'on' if ep=='aids' }}"><code>B2c</code><span>輔具管理</span></a>
+  <div class="grp">照顧評估</div>
+  <a href="{{ url_for('assess_list', typ='d61') }}" class="{{ 'on' if typ=='d61' or (ep=='assess_view' and a and a.type=='D61') }}"><code>D61</code><span>職能治療評估</span></a>
+  <a href="{{ url_for('assess_list', typ='icope') }}" class="{{ 'on' if typ=='icope' or (ep=='assess_view' and a and a.type=='ICOPE') }}"><code>六力</code><span>ICOPE 評估</span></a>
+  <div class="grp">自立支援</div>
+  <a href="{{ url_for('goals') }}" class="{{ 'on' if ep in ('goals','goals_from_icope') }}"><code>B10</code><span>復能目標追蹤</span></a>
+  <div class="grp">評鑑與報表</div>
+  <a href="{{ url_for('reports') }}" class="{{ 'on' if ep=='reports' }}">📦 <span>評鑑佐證／匯出</span></a>
+  <div class="grp">系統</div>
+  <a href="{{ url_for('settings') }}" class="{{ 'on' if ep=='settings' }}">⚙️ <span>設定／匯入／備份</span></a>
+</nav>
+<main>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</main>
+</div>
+{% block script %}{% endblock %}
+</body>
+</html>

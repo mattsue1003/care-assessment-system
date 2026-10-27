@@ -1,0 +1,18 @@
+{# 參數：x（輔具 dict 或 {}）, cs（個案清單，可為 None）, cid, back #}
+<form method="post" action="{{ url_for('aid_save', xid=x.id) if x.id else url_for('aid_save') }}" class="fr" style="margin:8px 0">
+  <input type="hidden" name="back" value="{{ back }}">
+  {% if cs %}<div><label class="f">個案</label><select name="client_id" required><option value="">請選擇</option>{% for c in cs %}<option value="{{ c.id }}" {{ 'selected' if c.id==x.client_id }}>{{ c.label }}</option>{% endfor %}</select></div>
+  {% else %}<input type="hidden" name="client_id" value="{{ cid }}">{% endif %}
+  <div><label class="f">輔具／用品</label><input type="text" name="item" value="{{ x.item or '' }}" list="aidlist" required style="width:150px"></div>
+  <div><label class="f">類別</label><select name="category">{% for s in ['行動','進食','如廁沐浴','穿著','溝通','擺位','其他'] %}<option {{ 'selected' if s==x.category }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">來源</label><select name="source">{% for s in ['','中心提供','自備','租借','政府補助'] %}<option {{ 'selected' if s==x.source }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">開始使用</label><input type="date" name="start_date" value="{{ x.start_date or '' }}"></div>
+  <div><label class="f">適配評估日</label><input type="date" name="fit_date" value="{{ x.fit_date or '' }}"></div>
+  <div><label class="f">使用訓練日</label><input type="date" name="train_date" value="{{ x.train_date or '' }}"></div>
+  <div><label class="f">最近檢查日</label><input type="date" name="check_date" value="{{ x.check_date or '' }}"></div>
+  <div><label class="f">狀態</label><select name="status">{% for s in ['使用中','停用'] %}<option {{ 'selected' if s==x.status }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">停用日</label><input type="date" name="end_date" value="{{ x.end_date or '' }}"></div>
+  <div style="flex:1"><label class="f">備註（高度調整、使用狀況…）</label><input type="text" name="note" value="{{ x.note or '' }}"></div>
+  <div><button class="btn pri">{{ '更新' if x.id else '新增' }}</button></div>
+</form>
+<datalist id="aidlist">{% for s in ['助行器','四腳助行器','帶輪助行器','單手拐杖','單手四腳拐杖','輪椅','高背輪椅','電動輪椅','爬梯機','洗澡椅','便盆椅','扶手','防滑墊','加粗握柄湯匙','彎角湯匙','防滑碗','斜口杯','筷子輔助器','穿襪輔具','長柄取物夾','助聽器','老花眼鏡','防跌護具'] %}<option>{{ s }}</option>{% endfor %}</datalist>

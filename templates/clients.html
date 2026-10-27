@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>B2 個案名冊</h1><div class="muted">共 {{ cs|length }} 位</div></div><span class="sp"></span>
+<a class="btn pri" href="{{ url_for('client_edit') }}">＋ 新增個案</a></div>
+<form class="card fr" method="get">
+  <div><label class="f">狀態</label><select name="status">{% for s in ['在案','暫停','結案','全部'] %}<option {{ 'selected' if s==st }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">評估狀態</label><select name="due"><option value="">全部</option>{% for s in ['逾期','30天內到期','未評估','正常'] %}<option {{ 'selected' if s==due }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">姓名／案號</label><input type="search" name="q" value="{{ q }}"></div>
+  <div><button class="btn pri">查詢</button></div>
+</form>
+<div class="tbl-wrap"><table class="t">
+<tr><th>案號</th><th>姓名</th><th>性別</th><th class="c">年齡</th><th>現有服務</th><th>最近 D61</th><th>最近六力</th><th>下次應評估</th><th>狀態</th><th></th></tr>
+{% for c in cs %}<tr>
+  <td>{{ c.case_no }}</td><td><a href="{{ url_for('client_view', cid=c.id) }}"><b>{{ c.name }}</b></a></td><td>{{ c.gender }}</td><td class="c">{{ c.age or '' }}</td>
+  <td class="small">{{ c.services }}</td><td>{{ c.due.last_d61|roc or '—' }}</td><td>{{ c.due.last_icope|roc or '—' }}</td>
+  <td>{{ c.due.next|roc or '—' }}</td><td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
+  <td class="btns"><a class="btn sm" href="{{ url_for('assess_edit', typ='icope', client=c.id) }}">六力</a><a class="btn sm" href="{{ url_for('assess_edit', typ='d61', client=c.id, **({'from':'icope'} if c.due.last_icope else {})) }}">D61</a></td>
+</tr>{% else %}<tr><td colspan="10" class="empty">沒有資料。可到「設定」從 Excel 名冊匯入。</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

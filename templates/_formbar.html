@@ -1,0 +1,14 @@
+<div class="formbar">
+  <div class="fr">
+    <div><label class="f">評估對象</label>
+      <select name="client_id" id="client_id" required onchange="{% if not a %}window.dirty=false;location.href='?client='+this.value{% endif %}" style="min-width:200px">
+        <option value="">— 請選擇個案 —</option>
+        {% for x in cs %}<option value="{{ x.id }}" {{ 'selected' if c and x.id==c.id }}>{{ x.label }}</option>{% endfor %}
+      </select></div>
+    <div><label class="f">評估日期</label><input type="date" name="date" value="{{ m.date }}" required></div>
+    <div><label class="f">類別</label><select name="kind">{% for s in ['初評','再評估','提前再評估（跌倒/住院/退化）'] %}<option {{ 'selected' if s==m.kind }}>{{ s }}</option>{% endfor %}</select></div>
+    <div><label class="f">評估者</label><input type="text" name="assessor" value="{{ m.assessor }}" style="width:120px"></div>
+    <span style="flex:1"></span>
+    <div class="btns">{% block extra_btns %}{% endblock %}<button class="btn pri" type="submit">💾 儲存</button></div>
+  </div>
+</div>

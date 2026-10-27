@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><h1>{{ '編輯個案' if c.id else '新增個案' }}</h1></div>
+<form class="card" method="post">
+<div class="grid g3">
+  {% for k, l in [('case_no','案號'),('name','姓名'),('birth','出生日期（民國 例 32/10/10 或西元）')] %}
+  <div><label class="f">{{ l }}</label><input type="text" name="{{ k }}" value="{{ (c[k]|roc) if k=='birth' else (c[k] or '') }}" style="width:100%"></div>{% endfor %}
+  <div><label class="f">性別</label><select name="gender" style="width:100%">{% for s in ['','女','男'] %}<option {{ 'selected' if s==c.gender }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label class="f">狀態</label><select name="status" style="width:100%">{% for s in ['在案','暫停','結案'] %}<option {{ 'selected' if s==c.status }}>{{ s }}</option>{% endfor %}</select></div>
+  {% for k, l in [('services','現有服務'),('supervisor','主責督導'),('living','居住情況'),('identity','身份別／收入別'),('diagnosis','診斷／病史'),('phone','電話（主）'),('phone2','電話（次）／聯絡人')] %}
+  <div><label class="f">{{ l }}</label><input type="text" name="{{ k }}" value="{{ c[k] or '' }}" style="width:100%"></div>{% endfor %}
+</div>
+<div style="margin-top:12px"><label class="f">通訊地址</label><input type="text" name="address" value="{{ c.address or '' }}" style="width:100%"></div>
+<div style="margin-top:12px"><label class="f">OT 備註</label><textarea name="note">{{ c.note or '' }}</textarea></div>
+<div class="btns" style="margin-top:14px"><button class="btn pri">儲存</button>{% if c.id %}<a class="btn" href="{{ url_for('client_view', cid=c.id) }}">取消</a>{% endif %}</div>
+</form>
+{% endblock %}

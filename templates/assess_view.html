@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead">
+  <div><h1>{{ 'D61 職能治療評估' if a.type=='D61' else '六力 ICOPE 評估' }}</h1>
+  <div class="muted"><a href="{{ url_for('client_view', cid=c.id) }}">{{ c.label }}</a>・{{ a.date|roc_long }}・{{ a.kind }}・{{ a.assessor }}</div></div>
+  <span class="sp"></span>
+  <div class="btns">
+    <a class="btn" href="{{ url_for('assess_edit', typ=a.type|lower, aid=a.id) }}">✏️ 編輯</a>
+    <a class="btn" href="{{ url_for('print_assess', aid=a.id) }}" target="_blank">🖨 列印</a>
+    <a class="btn pri" href="{{ url_for('export_assess', aid=a.id, fmt='pdf') }}">PDF</a>
+    <a class="btn pri" href="{{ url_for('export_assess', aid=a.id, fmt='docx') }}">Word</a>
+  </div>
+</div>
+<div class="grid g2" style="grid-template-columns: 1fr 340px">
+<div class="card" style="padding:0;overflow:hidden"><iframe src="{{ url_for('print_assess', aid=a.id) }}" style="width:100%;height:80vh;border:0;background:#888"></iframe></div>
+<div>
+  {% if a.type=='D61' %}
+  <div class="card">
+    <h2>care99 登打</h2>
+    <form method="post" action="{{ url_for('assess_keyed', aid=a.id) }}">
+      {% if a.keyed %}<span class="b ok">已登打</span> <button class="btn sm">改為未登打</button>
+      {% else %}<span class="b warn">尚未登打</span> <button class="btn sm pri">標記為已登打</button>{% endif %}
+    </form>
+    <p class="small muted">左側表單欄位順序與 care99 D61 相同，可對照逐項勾選。</p>
+    <button class="btn sm" onclick="navigator.clipboard.writeText(document.getElementById('sm').textContent);this.textContent='已複製 ✓'">複製「整體評估建議」</button>
+    <div id="sm" style="display:none">{{ a.summary }}</div>
+  </div>
+  {% if changes %}<div class="card"><h2>與上次（{{ prev.date|roc }}）比較</h2>
+    <ul class="changes small" style="padding-left:18px;margin:0">{% for lbl, a1, a2, k in changes %}<li class="{{ k }}">{{ lbl }}：{{ a1 }} → <b>{{ a2 }}</b>（{{ k }}）</li>{% endfor %}</ul></div>{% endif %}
+  {% else %}
+  <div class="card"><h2>判定</h2>
+    {% for k, l in S.ICOPE_ALL %}<div style="display:flex;justify-content:space-between;padding:3px 0"><span>{{ l }}</span><span class="b {{ judge.get(k,'') }}">{{ judge.get(k) or '—' }}</span></div>{% endfor %}
+  </div>
+  <div class="card"><h2>下一步</h2>
+    <a class="btn pri" href="{{ url_for('assess_edit', typ='d61', client=c.id, **{'from':'icope'}) }}">→ 依此結果建立 D61</a>
+    <a class="btn" style="margin-top:8px" href="{{ url_for('goals_from_icope', aid=a.id) }}">→ 建立自立支援目標</a>
+  </div>
+  {% endif %}
+  <div class="card"><form method="post" action="{{ url_for('assess_delete', aid=a.id) }}" onsubmit="return confirm('確定刪除這筆評估？刪除後無法復原（每日自動備份可找回）。')">
+    <button class="btn sm danger">刪除此評估</button></form></div>
+</div>
+</div>
+{% endblock %}

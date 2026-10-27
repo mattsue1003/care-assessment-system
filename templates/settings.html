@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><h1>設定／匯入／備份</h1></div>
+<div class="grid g2">
+<form class="card" method="post">
+  <h2>單位設定</h2>
+  <label class="f">單位名稱（印在表單抬頭）</label><input type="text" name="center_name" value="{{ s.center_name }}" style="width:100%">
+  <div class="grid g2" style="margin-top:8px">
+    <div><label class="f">六力表單「督導」姓名</label><input type="text" name="supervisor" value="{{ s.supervisor }}" style="width:100%"></div>
+    <div><label class="f">督導職稱</label><input type="text" name="supervisor_title" value="{{ s.supervisor_title }}" style="width:100%"></div>
+  </div>
+  <label class="f" style="margin-top:8px">再評估週期（月）</label><input type="number" name="reeval_months" value="{{ s.reeval_months }}" min="1" max="24">
+  <div style="margin-top:12px"><button class="btn pri">儲存設定</button></div>
+</form>
+<div class="card">
+  <h2>從 Excel 名冊匯入／更新</h2>
+  <p class="small muted" style="margin-top:0">讀取「福喜緣_在案個案名冊_職能治療追蹤_*.xlsx」：在案個案、D61 系統紀錄（日期）、紙本六力日期、輔具 B2c。可重複執行，不會重複建立。</p>
+  <form method="post" action="{{ url_for('import_roster') }}" enctype="multipart/form-data" class="fr">
+    <div><label class="f">選擇檔案（不選則用 00_個案名冊 資料夾中最新的一份）</label><input type="file" name="file" accept=".xlsx"></div>
+    <div><button class="btn pri">匯入</button></div>
+  </form>
+  <h2 style="margin-top:18px">備份</h2>
+  <p class="small muted" style="margin-top:0">每天第一次啟動會自動備份到 data/備份（保留 30 份）。也可手動下載一份放到隨身碟或雲端硬碟。</p>
+  <a class="btn" href="{{ url_for('backup') }}">⬇ 下載資料庫備份</a>
+</div>
+</div>
+<div class="card">
+  <h2>帳號</h2>
+  <table class="t"><tr><th>帳號</th><th>姓名</th><th>職稱</th><th>權限</th><th>修改（密碼留空表示不變）</th></tr>
+  {% for u in users %}<tr><td>{{ u.username }}</td><td>{{ u.name }}</td><td>{{ u.title }}</td><td>{{ '管理者' if u.role=='admin' else '一般' }}{{ '（停用）' if not u.active }}</td>
+    <td><form method="post" action="{{ url_for('user_save') }}" class="fr"><input type="hidden" name="id" value="{{ u.id }}">
+      <input type="text" name="name" value="{{ u.name }}" style="width:90px"><input type="text" name="title" value="{{ u.title or '' }}" style="width:110px">
+      <input type="password" name="password" placeholder="新密碼" style="width:110px" autocomplete="new-password">
+      <select name="active"><option value="1" {{ 'selected' if u.active }}>啟用</option><option value="0" {{ 'selected' if not u.active }}>停用</option></select>
+      <button class="btn sm">更新</button></form></td></tr>{% endfor %}
+  </table>
+  <details class="box" style="margin-top:10px"><summary>＋ 新增帳號（護理師、社工、照服員…）</summary>
+    <form method="post" action="{{ url_for('user_save') }}" class="fr" style="margin-top:8px">
+      <div><label class="f">帳號</label><input type="text" name="username"></div>
+      <div><label class="f">姓名</label><input type="text" name="name"></div>
+      <div><label class="f">職稱</label><input type="text" name="title"></div>
+      <div><label class="f">密碼</label><input type="password" name="password" autocomplete="new-password"></div>
+      <div><label class="f">權限</label><select name="role"><option value="staff">一般</option><option value="admin">管理者</option></select></div>
+      <div><button class="btn pri">新增</button></div>
+    </form></details>
+</div>
+<div class="card"><h2>操作紀錄（最近 30 筆）</h2>
+  <table class="t small">{% for l in logs %}<tr><td>{{ l.ts }}</td><td>{{ l.user }}</td><td>{{ l.action }}</td><td>{{ l.detail }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

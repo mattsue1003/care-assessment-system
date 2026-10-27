@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{% endblock %}</title>
+<style>
+  @page { size: A4 {% block orient %}{% endblock %}; margin: 10mm 12mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; color: #000; background: #fff; font-family: "PingFang TC", "Heiti TC", "Microsoft JhengHei", sans-serif;
+    font-size: 10.5pt; line-height: 1.4; }
+  .page { width: 100%; }
+  header { text-align: center; margin-bottom: 3mm; }
+  header .org { font-size: 12pt; letter-spacing: 2px; }
+  header h1 { font-size: 17pt; margin: 1mm 0 0; letter-spacing: 4px; }
+  header .sub { font-size: 8.5pt; color: #444; margin-top: 1mm; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1px solid #000; padding: 1.3mm 2mm; vertical-align: top; }
+  th { background: #e8e8e8; font-weight: 600; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .info th { width: 22mm; text-align: center; vertical-align: middle; white-space: nowrap; }
+  .info td { vertical-align: middle; }
+  .mt { margin-top: 3mm; }
+  .c { text-align: center; } .vm { vertical-align: middle; }
+  .v { color: #0b3d91; font-weight: 600; }
+  .sm { font-size: 9pt; } .xs { font-size: 8pt; }
+  .sub { font-weight: 600; margin: 0.4mm 0 0.3mm; } .sub small { font-weight: 400; color: #333; }
+  .opts { display: flex; flex-wrap: wrap; gap: 0.5mm 4mm; margin-bottom: 1mm; }
+  .opts span { white-space: nowrap; }
+  .opts span::before { content: "□"; margin-right: 0.8mm; font-size: 11pt; }
+  .opts span.on::before { content: "☑"; color: #0b3d91; }
+  .opts span.on { color: #0b3d91; font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 4mm; }
+  .grid2 > div { display: flex; gap: 2.5mm; align-items: baseline; }
+  .lbl { font-weight: 600; white-space: nowrap; min-width: 22mm; }
+  .grid2 .opts { flex-wrap: nowrap; gap: 0 3mm; margin: 0; }
+  .bad { color: #b00020; font-weight: 700; }
+  .sign { margin-top: 5mm; display: flex; justify-content: space-between; font-size: 11pt; }
+  .sign span::after { content: ""; display: inline-block; width: 38mm; border-bottom: 1px solid #000; margin-left: 1mm; }
+  .foot { text-align: right; font-size: 8pt; color: #555; margin-top: 2mm; }
+  .bar { position: sticky; top: 0; background: #333; color: #fff; padding: 8px 14px; display: flex; gap: 10px; align-items: center; font-size: 14px; z-index: 5; }
+  .bar button { font: inherit; padding: 4px 14px; border-radius: 6px; border: 0; cursor: pointer; }
+  @media screen {
+    body { background: #888; }
+    .page { background: #fff; width: 210mm; margin: 6mm auto; padding: 10mm 12mm; box-shadow: 0 2px 10px rgba(0,0,0,.4); min-height: 297mm; }
+    .land .page { width: 297mm; min-height: 210mm; }
+  }
+  @media print { .bar { display: none; } }
+  {% block css %}{% endblock %}
+</style>
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% if screen %}<div class="bar"><span>預覽（與 PDF 相同版面）</span><span style="flex:1"></span><button onclick="print()">🖨 列印／另存 PDF</button></div>{% endif %}
+{% block body %}{% endblock %}
+</body>
+</html>

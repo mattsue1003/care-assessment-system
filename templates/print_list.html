@@ -1,0 +1,24 @@
+{% extends "print_base.html" %}
+{% block orient %}landscape{% endblock %}
+{% block bodyclass %}land{% endblock %}
+{% block title %}{{ {'aids':'輔具使用清單','goals':'自立支援目標追蹤表','roster':'在案個案評估追蹤名冊'}[kind] }}{% endblock %}
+{% block css %} .t td, .t th { font-size: 9pt; } {% endblock %}
+{% block body %}
+<div class="page">
+  <header><div class="org">{{ p.center }}</div><h1>{{ {'aids':'B9 輔具使用清單','goals':'B10 自立支援目標追蹤表','roster':'在案個案評估追蹤名冊'}[kind] }}</h1>
+    <div class="sub">製表日期：{{ today()|roc_long }}</div></header>
+  {% if kind == 'aids' %}
+  <table class="t"><thead><tr><th>案號</th><th>姓名</th><th>輔具／用品</th><th>類別</th><th>來源</th><th>開始使用</th><th>適配評估</th><th>使用訓練</th><th>最近檢查</th><th>狀態</th><th>備註</th></tr></thead>
+  {% for x in p.aids %}<tr><td>{{ x.case_no }}</td><td>{{ x.name }}</td><td><b>{{ x.item }}</b></td><td>{{ x.category }}</td><td>{{ x.source }}</td>
+    {% for k in ['start_date','fit_date','train_date','check_date'] %}<td class="c">{{ x[k]|roc or '—' }}</td>{% endfor %}<td>{{ x.status }}</td><td>{{ x.note }}</td></tr>{% endfor %}</table>
+  {% elif kind == 'goals' %}
+  <table class="t"><thead><tr><th>案號</th><th>姓名</th><th>面向</th><th>目標</th><th>方法</th><th>基準</th><th>開始</th><th>檢討紀錄</th><th>狀態</th></tr></thead>
+  {% for gl in p.goals %}<tr><td>{{ gl.case_no }}</td><td>{{ gl.name }}</td><td>{{ gl.domain }}</td><td><b>{{ gl.goal }}</b></td><td>{{ gl.method }}</td><td>{{ gl.baseline }}</td>
+    <td class="c">{{ gl.start_date|roc }}</td><td>{% for r in gl.reviews %}<div>{{ r.date|roc }} {{ r.progress }}：{{ r.note }}</div>{% else %}—{% endfor %}</td><td class="c">{{ gl.status }}</td></tr>{% endfor %}</table>
+  {% else %}
+  <table class="t"><thead><tr><th>案號</th><th>姓名</th><th>性別</th><th>年齡</th><th>現有服務</th><th>主責督導</th><th>最近 D61</th><th>最近六力</th><th>下次應評估</th><th>狀態</th></tr></thead>
+  {% for c in p.cs %}<tr><td>{{ c.case_no }}</td><td>{{ c.name }}</td><td class="c">{{ c.gender }}</td><td class="c">{{ c.age }}</td><td>{{ c.services }}</td><td>{{ c.supervisor }}</td>
+    <td class="c">{{ c.due.last_d61|roc or '—' }}</td><td class="c">{{ c.due.last_icope|roc or '—' }}</td><td class="c">{{ c.due.next|roc or '—' }}</td><td class="c {{ 'bad' if c.due.status=='逾期' }}">{{ c.due.status }}</td></tr>{% endfor %}</table>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+<form method="post" action="{{ url_for('goal_save', xid=x.id) if x.id else url_for('goal_save') }}" class="fr" style="margin:8px 0">
+  <input type="hidden" name="back" value="{{ back }}">
+  {% if cs %}<div><label class="f">個案</label><select name="client_id" required><option value="">請選擇</option>{% for c in cs %}<option value="{{ c.id }}" {{ 'selected' if c.id==x.client_id }}>{{ c.label }}</option>{% endfor %}</select></div>
+  {% else %}<input type="hidden" name="client_id" value="{{ cid }}">{% endif %}
+  <div><label class="f">面向</label><select name="domain">{% for s in ['行動／肌力平衡','認知','日常生活自立','社會參與','感官','情緒','營養','其他'] %}<option {{ 'selected' if s==x.domain }}>{{ s }}</option>{% endfor %}</select></div>
+  <div style="flex:2 1 260px"><label class="f">目標（具體、可觀察）</label><input type="text" name="goal" value="{{ x.goal or '' }}" required placeholder="例：起立坐下 5 次縮短至 12 秒內"></div>
+  <div style="flex:2 1 220px"><label class="f">方法</label><input type="text" name="method" value="{{ x.method or '' }}" placeholder="例：運動團體＋每天坐站 10 下 × 3 組"></div>
+  <div style="flex:1 1 160px"><label class="f">基準（目前表現）</label><input type="text" name="baseline" value="{{ x.baseline or '' }}"></div>
+  <div><label class="f">開始日</label><input type="date" name="start_date" value="{{ x.start_date or today() }}"></div>
+  <div><label class="f">預定檢討日</label><input type="date" name="review_date" value="{{ x.review_date or '' }}"></div>
+  {% if x.id %}<div><label class="f">狀態</label><select name="status">{% for s in ['進行中','達成','停止'] %}<option {{ 'selected' if s==x.status }}>{{ s }}</option>{% endfor %}</select></div>{% endif %}
+  <div><button class="btn pri">{{ '更新' if x.id else '新增目標' }}</button></div>
+</form>

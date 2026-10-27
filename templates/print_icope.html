@@ -1,0 +1,47 @@
+{% extends "print_base.html" %}
+{% block title %}六力評估（{{ c.name }} {{ a.date|roc }}）{% endblock %}
+{% block css %}
+  .main td { font-size: 9.3pt; padding: 1.1mm 1.8mm; line-height: 1.32; } .nw { white-space: nowrap; margin-right: 1.5mm; }
+  .main .dom { width: 15mm; text-align: center; vertical-align: middle; font-weight: 700; background: #f4f4f4; }
+  .main .jd { width: 15mm; white-space: nowrap; text-align: center; vertical-align: middle; font-weight: 700; }
+  .main .act { width: 50mm; font-size: 9pt; }
+  .ln { margin: 0.3mm 0; }
+  .sep td { background: #e8e8e8; font-weight: 700; text-align: center; padding: 1mm; }
+{% endblock %}
+{% block body %}
+{% set d = a.data %}
+{% set rows = S.icope_rows(d) %}
+<div class="page">
+  <header><div class="org">{{ setting('center_name') }}</div><h1>職能治療 ICOPE 評估</h1>
+    <div class="sub">依國健署「長者功能評估」（ICOPE）六大面向：認知、行動、營養、視力、聽力、憂鬱</div></header>
+  <table class="info">
+    <tr><th>個案姓名</th><td class="v">{{ c.name }}</td><th>案號</th><td class="v">{{ c.case_no }}</td><th>性別／年齡</th><td class="v">{{ c.gender }}／{{ c.age }} 歲</td></tr>
+    <tr><th>出生日期</th><td class="v">{{ c.birth|roc }}</td><th>評估日期</th><td class="v" colspan="3">{{ a.date|roc_long }}　<span class="opts" style="display:inline-flex;margin:0 0 0 4mm">{% for o in ['初評','再評估'] %}<span class="{{ 'on' if (a.kind or '').startswith(o) }}">{{ o }}</span>{% endfor %}</span></td></tr>
+    <tr><th>督導<br><span class="xs">（{{ setting('supervisor_title') }}）</span></th><td class="v">{{ setting('supervisor') }}</td><th>評估者</th><td class="v">{{ a.assessor }}</td><th>行動輔具</th><td class="v">{{ d.get('mob_aid','') }}</td></tr>
+  </table>
+  <table class="main mt" style="table-layout:fixed"><colgroup><col style="width:15mm"><col><col style="width:15mm"><col style="width:50mm"></colgroup>
+    <thead><tr><th>面向</th><th>評估內容與結果</th><th>判定</th><th>後續處置／建議</th></tr></thead>
+    <tbody>
+    {% for k, lbl, lines, finding, acts in rows %}
+      {% if k == 'med' %}<tr class="sep"><td colspan="4">後續評估（初評有任一項異常時填寫）</td></tr>{% endif %}
+      <tr><td class="dom">{{ lbl|replace('社會照護與支持','社會照護<br>與支持')|replace('用藥評估','用藥<br>評估')|safe }}</td>
+        <td>{% for ln in lines %}<div class="ln">{{ ln|boxes }}</div>{% endfor %}
+          {% if finding %}<div class="ln v">說明：{{ finding }}</div>{% endif %}</td>
+        {% set jj = judge.get(k,'') %}
+        <td class="jd {{ 'bad' if jj in ('異常','需追蹤') }}">{{ jj }}</td>
+        <td class="act">{% for x in acts %}<div>▸ {{ x }}</div>{% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% set ab = S.icope_abnormal(d) %}
+  <table class="info mt">
+    <tr><th>本次結果</th><td><span class="bad">異常 {{ ab|length }} 項</span>（{{ ab|join('、') or '無' }}）　{% set ok = S.icope_normal(d) %}正常 {{ ok|length }} 項（{{ ok|join('、') or '無' }}）</td></tr>
+    <tr><th>目標</th><td class="v sm">{{ d.get('goal_text','')|e|replace('\n','<br>'|safe) }}</td></tr>
+    <tr><th>職能治療<br>處置建議</th><td class="v sm" style="line-height:1.55">{{ d.get('plan_text','')|e|replace('\n','<br>'|safe) }}</td></tr>
+    <tr><th>資源連結</th><td class="v sm">{{ d.get('resource_text','') }}</td></tr>
+    <tr><th>下次再評估</th><td><span class="v">{{ a.next_due|roc_long }}</span>　<span class="sm">（如跌倒、住院或功能明顯退化，要提前再評估）</span></td></tr>
+  </table>
+  <div class="sign"><span>評估者簽章：</span><span>個案／家屬：</span><span>主管覆核：</span></div>
+  <div class="foot">{{ c.case_no }} {{ c.name }}｜六力 ICOPE 評估｜{{ a.date|roc }}</div>
+</div>
+{% endblock %}

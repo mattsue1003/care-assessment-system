@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>自立支援／復能目標追蹤 <span class="small muted">（評鑑 B10）</span></h1>
+<div class="muted">每個目標建議 3 個月檢討一次；檢討紀錄就是評鑑佐證</div></div><span class="sp"></span>
+<div class="btns">{% for s in ['進行中','達成','停止','全部'] %}<a class="btn {{ 'pri' if s==st }}" href="?status={{ s }}">{{ s }}</a>{% endfor %}
+<a class="btn" href="{{ url_for('print_list', kind='goals') }}" target="_blank">🖨 列印</a></div></div>
+<details class="card box"><summary>＋ 新增目標</summary>{% with x={}, back=url_for('goals') %}{% include "_goal_form.html" %}{% endwith %}</details>
+<div class="tbl-wrap"><table class="t">
+<tr><th>個案</th><th>面向</th><th>目標</th><th>方法</th><th>開始</th><th>檢討日</th><th>最近檢討</th><th>狀態</th></tr>
+{% for gl in rows %}<tr>
+  <td><a href="{{ url_for('client_view', cid=gl.client_id) }}">{{ gl.name }}</a> <span class="muted small">{{ gl.case_no }}</span></td>
+  <td>{{ gl.domain }}</td><td><b>{{ gl.goal }}</b><div class="small muted">基準：{{ gl.baseline or '—' }}</div></td><td class="small">{{ gl.method }}</td>
+  <td>{{ gl.start_date|roc }}</td><td>{% if gl.overdue %}<span class="b bad">{{ gl.review_date|roc }} 已到期</span>{% else %}{{ gl.review_date|roc }}{% endif %}</td>
+  <td class="small">{% if gl.last %}{{ gl.last.date|roc }} <span class="b {{ gl.last.progress }}">{{ gl.last.progress }}</span> {{ gl.last.note }}{% else %}—{% endif %}
+    {% if gl.status=='進行中' %}<details><summary class="small">＋ 檢討</summary>{% with gl=gl, back=request.full_path %}{% include "_review_form.html" %}{% endwith %}</details>{% endif %}</td>
+  <td>{{ gl.status }}</td>
+</tr>{% else %}<tr><td colspan="8" class="empty">沒有資料。可從六力評估結果一鍵建立目標。</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% macro radio(key) -%}
+  <div class="pills">{% for o in S.ICOPE_Q[key][1] %}<label class="pill {{ 'bad' if o in ['是','有錯誤','錯','有困難','聽不到','雙手扶扶手','無法完成','需監視'] }}"><input type="radio" name="{{ key }}" value="{{ o }}" {{ 'checked' if data.get(key)==o }}><span>{{ o }}</span></label>{% endfor %}</div>
+{%- endmacro %}
+{% macro q(key) -%}
+  <div class="q"><div class="ql">{{ S.ICOPE_Q[key][0] }}</div>{{ radio(key) }}</div>
+{%- endmacro %}
+{% macro dom(k, label, sub='') -%}
+  <div class="card dom {{ judge.get(k,'') }}" id="dom_{{ k }}">
+    <div class="fr" style="justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h2 style="margin:0">{{ label }} <span class="small muted" style="font-weight:400">{{ sub }}</span></h2>
+      <div class="btns small">判定：<span class="b judge {{ judge.get(k,'') }}" id="j_{{ k }}">{{ judge.get(k) or '未填' }}</span>
+        <select name="{{ k }}_judge" title="手動判定（預設自動）" style="font-size:13px;padding:3px 6px">
+          {% for o in ['', '正常', '異常'] if k not in ('med','soc') %}<option value="{{ o }}" {{ 'selected' if data.get(k+'_judge','')==o }}>{{ o or '自動判定' }}</option>{% endfor %}
+          {% for o in ['', '無異常', '需追蹤'] if k in ('med','soc') %}<option value="{{ o }}" {{ 'selected' if data.get(k+'_judge','')==o }}>{{ o or '自動判定' }}</option>{% endfor %}
+        </select></div>
+    </div>
+    {{ caller() }}
+    <div class="q"><div class="ql" style="flex:0 0 auto">說明</div><input type="text" name="{{ k }}_finding" value="{{ data.get(k+'_finding','') }}" style="flex:1" placeholder="結果說明（會印在表單上）"></div>
+    <div class="act"><div class="small muted" style="margin-bottom:4px">後續處置（只列介入／團體／轉介）</div>
+      <div class="pills">{% for s in S.SUGGEST[k] %}<label class="pill"><input type="checkbox" name="{{ k }}_actions" value="{{ s }}" {{ 'checked' if s in (data.get(k+'_actions') or []) }}><span>{{ s }}</span></label>{% endfor %}</div>
+      <input type="text" class="other" name="{{ k }}_actions_other" value="{{ data.get(k+'_actions_other','') }}" placeholder="其他處置" style="width:100%"></div>
+  </div>
+{%- endmacro %}
+
+{% block body %}
+<div class="pagehead"><div><h1>六力 ICOPE 評估 {{ '（編輯）' if a else '（新增）' }}</h1>
+<div class="muted small">依國健署「長者功能評估」六大面向；系統自動判定，可手動修正</div></div></div>
+<form method="post" id="f" action="{{ url_for('assess_save', typ='icope', aid=a.id) if a else url_for('assess_save', typ='icope') }}">
+<input type="hidden" name="_action" id="_action" value="">
+{% include "_formbar.html" %}
+{% if not c %}<div class="card empty">請先在上方選擇評估對象</div>{% else %}
+{% if src %}<div class="src">ℹ️ {{ src }}</div>{% endif %}
+{% if not a and prev %}<div class="card btns small">上次六力：{{ prev.date|roc }}（異常：{{ S.icope_abnormal(prev.data)|join('、') or '無' }}）
+  {% if not src %}<a class="btn sm" href="?client={{ c.id }}&from=last">📋 帶入上次內容再修改</a>{% endif %}</div>{% endif %}
+
+<div class="grid g2">
+<div>
+{% call dom('cog', '認知') %}
+  {{ q('cog_memory') }}
+  <div class="q"><div class="ql">定向：今天是哪年、哪月、哪日？現在在哪裡？</div></div>
+  <div class="q" style="border-top:0;padding-top:0">{% for k in ['cog_year','cog_month','cog_day','cog_place'] %}<span style="display:flex;gap:6px;align-items:center"><b>{{ S.ICOPE_Q[k][0] }}</b>{{ radio(k) }}</span>{% endfor %}</div>
+{% endcall %}
+{% call dom('mob', '行動', '起立坐下 5 次，標準：雙手抱胸、12 秒內完成') %}
+  <div class="q"><div class="ql">完成時間</div><input type="number" step="0.1" min="0" name="mob_seconds" value="{{ data.get('mob_seconds','') }}" style="width:100px"> 秒</div>
+  <div class="q"><div class="ql">方式</div>{{ radio('mob_method') }}</div>
+  {% set aid0 = (aids|selectattr('status','equalto','使用中')|selectattr('category','equalto','行動')|map(attribute='item')|first) %}
+  <div class="q"><div class="ql">日常行走（輔具）</div><input type="text" name="mob_aid" value="{{ data.get('mob_aid', aid0 or '') }}" list="mobaids" style="width:130px" placeholder="無／助行器…">{{ radio('mob_supervise') }}</div>
+  <datalist id="mobaids">{% for s in ['無','單手拐杖','單手四腳拐杖','助行器','帶輪助行器','輪椅'] %}<option>{{ s }}</option>{% endfor %}</datalist>
+{% endcall %}
+{% call dom('nut', '營養') %}{{ q('nut_weight') }}{{ q('nut_appetite') }}{% endcall %}
+{% call dom('med', '用藥評估', '後續評估') %}{{ q('med_10') }}{{ q('med_sleep') }}{{ q('med_pain') }}
+  <div class="q"><div class="ql" style="flex:0 0 auto">用藥說明</div><input type="text" name="med_note" value="{{ data.get('med_note','') }}" style="flex:1" placeholder="例：偶爾服用止痛藥（腰部、腳痠）"></div>{% endcall %}
+</div>
+<div>
+{% call dom('vis', '視力', '看遠、看近或閱讀時，是否有困難？') %}
+  <div class="q"><div class="ql">看遠</div>{{ radio('vis_far') }}</div>
+  <div class="q"><div class="ql">看近／閱讀</div>{{ radio('vis_near') }}</div>
+  <div class="q"><div class="ql">老花眼鏡</div>{{ radio('vis_glasses') }}</div>
+  <div class="q"><div class="ql">過去一年做過眼科檢查</div>{{ radio('vis_exam') }}<input type="text" name="vis_exam_note" value="{{ data.get('vis_exam_note','') }}" placeholder="原因（如：個案不想）" style="width:160px"></div>
+{% endcall %}
+{% call dom('hear', '聽力', '氣音測試 6-1-9／2-5-7') %}
+  <div class="q"><div class="ql">右耳</div>{{ radio('hear_r') }}</div>
+  <div class="q"><div class="ql">左耳</div>{{ radio('hear_l') }}</div>
+  <div class="q"><div class="ql" style="flex:0 0 auto">原因／說明</div><input type="text" name="hear_note" value="{{ data.get('hear_note','') }}" style="flex:1" placeholder="例：右耳先天聽損，已用左耳代償"></div>
+{% endcall %}
+{% call dom('dep', '憂鬱（情緒）') %}{{ q('dep_low') }}{{ q('dep_interest') }}
+  <div class="q"><div class="ql" style="flex:0 0 auto">情緒狀況</div><input type="text" name="dep_note" value="{{ data.get('dep_note','') }}" style="flex:1" placeholder="例：穩定（心情 OK）；入睡晚"></div>{% endcall %}
+{% call dom('soc', '社會照護與支持', '後續評估') %}{{ q('soc_adl') }}
+  <div class="q"><div class="ql" style="flex:0 0 auto">說明</div><input type="text" name="soc_note" value="{{ data.get('soc_note','') }}" style="flex:1" placeholder="例：獨立"></div>{% endcall %}
+</div>
+</div>
+
+<div class="card sum-box">
+  <h2>本次結果：<span id="sumline">—</span></h2>
+  <div class="grid g2">
+    <div><label class="f">目標</label><textarea name="goal_text" style="min-height:70px" placeholder="例：維持下肢肌力與行走安全；維持定向感">{{ data.get('goal_text','') }}</textarea></div>
+    <div><label class="f">資源連結</label><textarea name="resource_text" style="min-height:70px" placeholder="例：社工排入運動團體、認知團體（D75 個別化）">{{ data.get('resource_text','') }}</textarea></div>
+  </div>
+  <div class="fr" style="justify-content:space-between;margin-top:10px"><label class="f" style="margin:0">職能治療處置建議</label>
+    <button type="button" class="btn sm acc" onclick="genPlan()">✨ 依勾選的後續處置產生</button></div>
+  <textarea name="plan_text" id="plan_text" style="min-height:120px;margin-top:4px">{{ data.get('plan_text','') }}</textarea>
+  <div class="fr" style="margin-top:12px">
+    <div><label class="f">下次再評估（預設 6 個月；跌倒、住院或明顯退化要提前）</label><input type="date" name="next_due" value="{{ m.next_due }}"></div>
+    <div style="flex:1"><label class="f">備註</label><input type="text" name="note" value="{{ m.note }}" style="width:100%"></div>
+  </div>
+  <div class="btns" style="margin-top:14px"><button class="btn pri">💾 儲存</button>
+    <button class="btn acc" onclick="document.getElementById('_action').value='goals'">💾 儲存並建立自立支援目標 →</button></div>
+</div>
+{% endif %}
+</form>
+{% endblock %}
+{% block script %}
+<script>
+const f=document.getElementById('f');
+async function refresh(){
+  if(!document.getElementById('sumline')) return;
+  const r=await fetch('{{ url_for("api_icope") }}',{method:'POST',body:new FormData(f)}); const j=await r.json();
+  for(const [k,v] of Object.entries(j.judge)){
+    const b=document.getElementById('j_'+k); if(!b) continue;
+    b.textContent=v||'未填'; b.className='b judge '+(v||'');
+    const d=document.getElementById('dom_'+k); d.className='card dom '+(v||'');
+  }
+  document.getElementById('sumline').innerHTML = `<span class="b 異常">異常 ${j.abnormal.length} 項</span> ${j.abnormal.join('、')||''}　<span class="b 正常">正常 ${j.normal.length} 項</span> ${j.normal.join('、')}`;
+  window._plan=j.plan;
+}
+f.addEventListener('change', refresh); refresh();
+async function genPlan(){ await refresh(); const t=document.getElementById('plan_text');
+  if(t.value.trim() && !confirm('要用產生的內容取代目前文字嗎？')) return; t.value=window._plan||'（尚未勾選任何後續處置）'; }
+window.dirty=false; f.addEventListener("input",()=>window.dirty=true); f.addEventListener("submit",()=>window.dirty=false);
+window.addEventListener('beforeunload',e=>{ if(window.dirty){ e.preventDefault(); e.returnValue=''; } });
+</script>
+{% endblock %}

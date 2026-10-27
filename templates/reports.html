@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>評鑑佐證／匯出中心</h1>
+<div class="muted">對應 115 年桃園市社區式「小規模多機能」評鑑基準（附件2-3）：B1 評估與再評估、B9 輔具、B10 自立支援</div></div></div>
+
+<div class="grid g3">
+  <div class="card"><h3>B1 評估／再評估（每 6 個月）</h3><b style="font-size:28px">{{ ind.b1[1] }}%</b>
+    <div class="bar"><i style="width:{{ ind.b1[1] }}%"></i></div><div class="small muted">{{ ind.b1[0] }}／{{ ind.n }} 位近 6 個月內有評估</div>
+    <a class="small" href="{{ url_for('clients', due='逾期') }}">查看逾期名單 →</a></div>
+  <div class="card"><h3>B9 輔具佐證完整</h3><b style="font-size:28px">{{ ind.b9[2] }}%</b>
+    <div class="bar"><i style="width:{{ ind.b9[2] }}%"></i></div><div class="small muted">{{ ind.b9[0] }}／{{ ind.b9[1] }} 件有開始日＋適配評估＋使用訓練</div>
+    <a class="small" href="{{ url_for('aids', miss=1) }}">補資料 →</a></div>
+  <div class="card"><h3>B10 自立支援目標</h3><b style="font-size:28px">{{ ind.b10[1] }}%</b>
+    <div class="bar"><i style="width:{{ ind.b10[1] }}%"></i></div><div class="small muted">{{ ind.b10[0] }}／{{ ind.n }} 位有進行中目標；近 3 個月檢討 {{ ind.b10[2] }}／{{ ind.b10[3] }} 項</div>
+    <a class="small" href="{{ url_for('goals') }}">目標追蹤 →</a></div>
+</div>
+
+<div class="card">
+  <h2>📦 一鍵匯出評鑑佐證包（ZIP）</h2>
+  <p class="muted small" style="margin-top:0">內含：00_總表（Excel 總表＋在案名冊 PDF）／B1_評估與再評估（每位個案一個資料夾：期間內每次 D61、六力表單＋個案評估彙整）／B9_輔具使用清單／B10_自立支援目標追蹤表。</p>
+  <form class="fr" method="get" action="{{ url_for('export_pack') }}" onsubmit="this.querySelector('button').textContent='產生中，請稍候（約 1–2 分鐘）…'">
+    <div><label class="f">期間</label><span><input type="date" name="from" value="{{ f }}"> 至 <input type="date" name="to" value="{{ t }}"></span></div>
+    <div><label class="f">表單格式</label><select name="fmt"><option value="pdf">PDF（與列印相同）</option><option value="docx">Word（可再編輯）</option></select></div>
+    <div><button class="btn pri">下載佐證包</button></div>
+  </form>
+</div>
+
+<div class="grid g2">
+<div class="card">
+  <h2>📊 Excel 總表</h2>
+  <p class="muted small" style="margin-top:0">工作表：指標摘要、在案個案評估追蹤、D61 職能治療評估（每欄一項）、六力 ICOPE 評估、六力統計、B9 輔具清單、B10 自立支援目標</p>
+  <form class="fr" method="get" action="{{ url_for('export_excel') }}">
+    <div><label class="f">期間</label><span><input type="date" name="from" value="{{ f }}"> 至 <input type="date" name="to" value="{{ t }}"></span></div>
+    <div><button class="btn pri">下載 Excel</button></div>
+  </form>
+</div>
+<div class="card">
+  <h2>🖨 單張清單（可列印或存 PDF）</h2>
+  <div class="btns">
+    <a class="btn" href="{{ url_for('print_list', kind='roster') }}" target="_blank">在案個案評估追蹤名冊</a>
+    <a class="btn" href="{{ url_for('print_list', kind='aids') }}" target="_blank">B9 輔具使用清單</a>
+    <a class="btn" href="{{ url_for('print_list', kind='goals') }}" target="_blank">B10 自立支援目標追蹤表</a>
+  </div>
+  <p class="muted small">個別個案的表單請到個案頁或評估頁下載 Word／PDF。</p>
+</div>
+</div>
+
+<div class="card">
+  <h2>個案評估彙整（每人一份）</h2>
+  <div class="tbl-wrap"><table class="t">
+  <tr><th>案號</th><th>姓名</th><th>最近評估</th><th>狀態</th><th>匯出</th></tr>
+  {% for c in cs %}<tr><td>{{ c.case_no }}</td><td>{{ c.name }}</td><td>{{ c.due.last|roc or '—' }}</td><td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
+    <td class="btns"><a class="btn sm" href="{{ url_for('print_client', cid=c.id) }}" target="_blank">預覽</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='pdf') }}">PDF</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='docx') }}">Word</a></td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

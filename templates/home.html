@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>今日待辦</h1><div class="muted">{{ today()|roc_long }}　在案 {{ cs|length }} 位</div></div>
+<span class="sp"></span>
+<div class="btns"><a class="btn pri" href="{{ url_for('assess_edit', typ='icope') }}">＋ 六力評估</a>
+<a class="btn pri" href="{{ url_for('assess_edit', typ='d61') }}">＋ D61 職能治療評估</a></div></div>
+
+<div class="grid g4">
+  <a class="stat bad" href="{{ url_for('clients', due='逾期') }}"><span>再評估逾期</span><b>{{ counts['逾期'] }}</b><span class="small muted">超過 6 個月未評估</span></a>
+  <a class="stat info" href="{{ url_for('clients', due='30天內到期') }}"><span>30 天內到期</span><b>{{ counts['30天內到期'] }}</b><span class="small muted">請排入本月</span></a>
+  <a class="stat warn" href="{{ url_for('clients', due='未評估') }}"><span>從未評估</span><b>{{ counts['未評估'] }}</b><span class="small muted">需完成初評</span></a>
+  <a class="stat ok" href="{{ url_for('clients', due='正常') }}"><span>評估正常期限內</span><b>{{ counts['正常'] }}</b><span class="small muted">&nbsp;</span></a>
+</div>
+
+<div class="grid g2" style="margin-top:16px">
+<div class="card">
+  <h2>需安排評估（依急迫性）</h2>
+  {% if todo %}
+  <table class="t"><tr><th>個案</th><th>最近評估</th><th>應評估日</th><th>狀態</th><th></th></tr>
+  {% for c in todo %}<tr>
+    <td><a href="{{ url_for('client_view', cid=c.id) }}">{{ c.label }}</a></td>
+    <td>{{ c.due.last|roc or '—' }}</td><td>{{ c.due.next|roc or '—' }}</td>
+    <td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
+    <td><a class="btn sm" href="{{ url_for('assess_edit', typ='icope', client=c.id) }}">評估</a></td></tr>{% endfor %}
+  </table>
+  {% else %}<div class="empty">全部個案都在評估期限內 👍</div>{% endif %}
+</div>
+<div>
+  <div class="card">
+    <h2>評鑑指標進度 <span class="small muted">（115 年 小規模多機能 附件2-3）</span></h2>
+    <div style="margin-bottom:12px"><b>B1</b> 近 6 個月內完成評估／再評估　<span class="muted">{{ ind.b1[0] }}／{{ ind.n }} 位</span>
+      <div class="bar"><i style="width:{{ ind.b1[1] }}%"></i></div></div>
+    <div style="margin-bottom:12px"><b>B9</b> 輔具佐證完整（開始日＋適配評估＋使用訓練）　<span class="muted">{{ ind.b9[0] }}／{{ ind.b9[1] }} 件</span>
+      <div class="bar"><i style="width:{{ ind.b9[2] }}%"></i></div></div>
+    <div><b>B10</b> 有自立支援目標的個案　<span class="muted">{{ ind.b10[0] }}／{{ ind.n }} 位；近 3 個月有檢討 {{ ind.b10[2] }}／{{ ind.b10[3] }} 項</span>
+      <div class="bar"><i style="width:{{ ind.b10[1] }}%"></i></div></div>
+    <p style="margin:12px 0 0"><a href="{{ url_for('reports') }}">前往評鑑佐證／一鍵匯出 →</a></p>
+  </div>
+  <div class="card">
+    <h2>D61 尚未登打 care99 <span class="b warn">{{ unkeyed|length }}</span></h2>
+    {% if unkeyed %}<ul style="margin:0;padding-left:18px">{% for a in unkeyed %}
+      <li><a href="{{ url_for('assess_view', aid=a.id) }}">{{ a.name }}（{{ a.case_no }}）{{ a.date|roc }}</a></li>{% endfor %}</ul>
+    {% else %}<div class="muted">都已登打完成</div>{% endif %}
+  </div>
+  <div class="card">
+    <h2>最近編輯</h2>
+    {% for a in recent %}<div><a href="{{ url_for('assess_view', aid=a.id) }}">{{ a.date|roc }}　{{ a.name }}　{{ '六力' if a.type=='ICOPE' else 'D61' }}</a> <span class="muted small">{{ a.assessor }}</span></div>
+    {% else %}<div class="muted">尚無紀錄</div>{% endfor %}
+  </div>
+</div>
+</div>
+{% endblock %}

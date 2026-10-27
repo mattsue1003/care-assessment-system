@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>依六力結果建立自立支援目標</h1>
+<div class="muted">{{ c.label }}・六力評估 {{ a.date|roc }}・勾選要建立的目標，可直接修改文字；預設 3 個月後檢討</div></div></div>
+<form method="post" class="card">
+{% for k, dom, goal, method, base in sug %}
+  <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+    <label><input type="checkbox" name="use_{{ k }}" checked> <b>{{ dom }}</b></label>
+    <div class="grid g3" style="margin-top:6px">
+      <div><label class="f">目標</label><input type="text" name="goal_{{ k }}" value="{{ goal }}" style="width:100%"></div>
+      <div><label class="f">方法</label><input type="text" name="method_{{ k }}" value="{{ method }}" style="width:100%"></div>
+      <div><label class="f">基準（目前表現）</label><input type="text" name="base_{{ k }}" value="{{ base }}" style="width:100%"></div>
+    </div>
+  </div>
+{% else %}<div class="empty">此次六力沒有異常面向，不需建立目標。</div>{% endfor %}
+<div class="btns"><button class="btn pri">建立勾選的目標</button><a class="btn" href="{{ url_for('client_view', cid=c.id) }}">略過</a></div>
+</form>
+{% endblock %}

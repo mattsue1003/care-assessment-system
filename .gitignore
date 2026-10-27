@@ -1,0 +1,8 @@
+# 正式資料（含個資）絕對不可上傳
+data/
+*.db
+!demo/demo.db
+.venv/
+__pycache__/
+.DS_Store
+~$*

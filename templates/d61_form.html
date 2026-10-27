@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>D61 職能治療評估 {{ '（編輯）' if a else '（新增）' }}</h1>
+<div class="muted small">欄位與 care99 D61 相同，存檔後可直接對照登打、匯出 Word／PDF</div></div></div>
+<form method="post" id="f" action="{{ url_for('assess_save', typ='d61', aid=a.id) if a else url_for('assess_save', typ='d61') }}">
+{% include "_formbar.html" %}
+{% if not c %}<div class="card empty">請先在上方選擇評估對象</div>{% else %}
+{% if src %}<div class="src">ℹ️ {{ src }}</div>{% endif %}
+{% if not a %}<div class="card btns small">
+  快速帶入：
+  {% if prev %}<a class="btn sm" href="?client={{ c.id }}&from=last">📋 帶入上次 D61（{{ prev.date|roc }}）</a>{% endif %}
+  {% if ic_latest %}<a class="btn sm" href="?client={{ c.id }}&from=icope">🧭 依六力結果帶入（{{ ic_latest.date|roc }}）</a>{% endif %}
+  {% if not prev and not ic_latest %}<span class="muted">此個案尚無前次評估，建議先做六力評估再帶入。</span>{% endif %}
+  {% if prev %}<span class="muted">・灰字「上次」為前次結果，變動處會標紅</span>{% endif %}
+</div>{% endif %}
+
+{% for sec in S.D61 %}
+<div class="card sec" data-sec="{{ sec.no }}">
+  <div><div class="no">序號 {{ sec.no }}</div><div class="ttl">{{ sec.title }}</div>
+    {% if sec.fields|selectattr('type','equalto','radio')|list %}<button type="button" class="btn sm" style="margin-top:6px" onclick="allNormal(this)">本區全部正常</button>{% endif %}
+  </div>
+  <div>
+  {% for f in sec.fields %}
+    {% set v = data.get(f.key) %}
+    {% set pv = prev.data.get(f.key) if prev else None %}
+    <div class="fld {{ 'wide' if f.type!='radio' }}">
+      <div class="lb">{{ f.label }}{% if f.hint %}<div class="hint">{{ f.hint }}</div>{% endif %}</div>
+      <div>
+      {% if f.type == 'multi' %}
+        <div class="pills">{% for o in f.options %}<label class="pill {{ 'bad' if f.key in ('adl_help','bpsd') }}"><input type="checkbox" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v and o in v }}><span>{{ o }}</span></label>{% endfor %}</div>
+        {% if f.other %}<input type="text" class="other" name="{{ f.key }}_other" value="{{ data.get(f.key+'_other','') }}" placeholder="其他：">{% endif %}
+        {% if pv %}<div class="small muted" style="margin-top:4px">上次：{{ pv|join('、') }}</div>{% endif %}
+      {% elif f.type == 'radio' %}
+        <div class="pills" data-prev="{{ pv or '' }}">{% for o in f.options %}<label class="pill {{ 'bad' if not loop.first }}"><input type="radio" name="{{ f.key }}" value="{{ o }}" {{ 'checked' if v==o }}><span>{{ o }}</span></label>{% endfor %}</div>
+        {% if f.note %}<input type="text" class="note-in" name="{{ f.key }}_note" value="{{ data.get(f.key+'_note','') }}" placeholder="備註部位／說明">{% endif %}
+      {% else %}
+        <input type="text" name="{{ f.key }}" value="{{ v or '' }}" style="width:100%" placeholder="{{ '例：參加體適能運動、團體認知活動' if f.key=='sched_am' else '' }}">
+      {% endif %}
+      </div>
+      {% if f.type=='radio' %}<div class="prev">{% if pv %}上次：{{ pv }}{% endif %}</div>{% endif %}
+    </div>
+  {% endfor %}
+    <div class="fld wide"><div class="lb muted">備註</div><input type="text" name="s{{ sec.no }}_note" value="{{ data.get('s'+sec.no+'_note','') }}" style="width:100%"></div>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card sum-box">
+  <div class="fr" style="justify-content:space-between"><h2 style="margin:0">整體評估建議</h2>
+    <div class="btns"><label class="small"><input type="checkbox" id="with_icope" {{ 'checked' if ic_latest }}> 納入最近六力結果</label>
+    <button type="button" class="btn acc" onclick="genNarr()">✨ 依勾選自動產生</button></div></div>
+  <p class="muted small" style="margin:4px 0 8px">自動產生的是初稿，請依個案狀況修改；內容可直接貼到 care99 的「整體評估建議」。</p>
+  <textarea name="summary" id="summary" style="min-height:160px">{{ m.summary }}</textarea>
+  <div class="grid g3" style="margin-top:12px">
+    <div><label class="f">備註</label><input type="text" name="note" value="{{ m.note }}" style="width:100%"></div>
+    <div><label class="f">下次再評估日（預設 6 個月後）</label><input type="date" name="next_due" value="{{ m.next_due }}"></div>
+    <div><label class="f">care99 登打</label><label><input type="checkbox" name="keyed" value="1" {{ 'checked' if m.keyed }}> 已登打到 care99 D61</label></div>
+  </div>
+  <div class="btns" style="margin-top:14px"><button class="btn pri">💾 儲存評估</button>
+    <button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('summary').value);this.textContent='已複製 ✓'">複製建議文字</button></div>
+</div>
+{% endif %}
+</form>
+{% endblock %}
+{% block script %}
+<script>
+function allNormal(btn){
+  btn.closest('.sec').querySelectorAll('.pills').forEach(p=>{
+    const first=p.querySelector('input[type=radio]'); if(first){ first.checked=true; }
+  }); markPrev();
+}
+function markPrev(){
+  document.querySelectorAll('.pills[data-prev]').forEach(p=>{
+    const pv=p.dataset.prev, cur=(p.querySelector('input:checked')||{}).value||'';
+    const tag=p.closest('.fld').querySelector('.prev');
+    if(tag) tag.classList.toggle('diff', !!pv && !!cur && pv!==cur);
+  });
+}
+document.addEventListener('change', markPrev); markPrev();
+async function genNarr(){
+  const fd=new FormData(document.getElementById('f'));
+  if(document.getElementById('with_icope')?.checked) fd.append('with_icope','1');
+  const ta=document.getElementById('summary');
+  if(ta.value.trim() && !confirm('要用自動產生的內容取代目前的文字嗎？')) return;
+  const r=await fetch('{{ url_for("api_narrative") }}',{method:'POST',body:fd}); ta.value=(await r.json()).text;
+}
+window.dirty=false; document.getElementById('f').addEventListener("input",()=>window.dirty=true);
+document.getElementById('f').addEventListener("submit",()=>window.dirty=false);
+window.addEventListener('beforeunload',e=>{ if(window.dirty){ e.preventDefault(); e.returnValue=''; } });
+</script>
+{% endblock %}

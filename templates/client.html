@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block body %}
+{% set back = url_for('client_view', cid=c.id) %}
+<div class="pagehead">
+  <div><h1>{{ c.name }} <span class="muted" style="font-size:16px">{{ c.case_no }}</span> <span class="b {{ due.status }}">評估：{{ due.status }}</span></h1>
+  <div class="muted">{{ c.gender }}・{{ c.age or '?' }} 歲・{{ c.services }}・{{ c.status }}</div></div>
+  <span class="sp"></span>
+  <div class="btns">
+    <a class="btn pri" href="{{ url_for('assess_edit', typ='icope', client=c.id, **({'from':'last'} if icopes else {})) }}">＋ 六力評估</a>
+    <a class="btn pri" href="{{ url_for('assess_edit', typ='d61', client=c.id, **({'from':'icope'} if icopes else ({'from':'last'} if d61s else {}))) }}">＋ D61 評估</a>
+    <a class="btn" href="{{ url_for('client_edit', cid=c.id) }}">編輯資料</a>
+  </div>
+</div>
+<div class="card btns"><b>個案評估彙整（評鑑用）：</b>
+  <a class="btn sm" href="{{ url_for('print_client', cid=c.id) }}" target="_blank">預覽／列印</a>
+  <a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='pdf') }}">下載 PDF</a>
+  <a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='docx') }}">下載 Word</a>
+</div>
+
+<div class="grid g2">
+<div class="card">
+  <h2>基本資料</h2>
+  <dl class="kv">
+    <dt>出生日期</dt><dd>{{ c.birth|roc or '—' }}</dd>
+    <dt>主責督導</dt><dd>{{ c.supervisor or '—' }}</dd>
+    <dt>居住情況</dt><dd>{{ c.living or '—' }}</dd>
+    <dt>身份別</dt><dd>{{ c.identity or '—' }}</dd>
+    <dt>診斷／病史</dt><dd>{{ c.diagnosis or '—' }}</dd>
+    <dt>電話</dt><dd>{{ c.phone or '' }} {{ c.phone2 or '' }}</dd>
+    <dt>地址</dt><dd>{{ c.address or '—' }}</dd>
+    <dt>OT 備註</dt><dd>{{ c.note or '—' }}</dd>
+    <dt>最近評估</dt><dd>{{ due.last|roc or '—' }}</dd>
+    <dt>下次應評估</dt><dd><b>{{ due.next|roc or '—' }}</b> <span class="b {{ due.status }}">{{ due.status }}</span></dd>
+  </dl>
+</div>
+<div class="card">
+  <h2>評估歷程</h2>
+  <ul class="tl">
+  {% for a in allas %}
+    <li class="{{ 'hist' if 'HIST' in a.type }}">
+      {% if 'HIST' in a.type %}<b>{{ a.date|roc }}</b>　{{ 'D61' if 'D61' in a.type else '六力' }}（歷史紀錄）<span class="muted small">{{ a.note }}</span>
+      {% else %}<a href="{{ url_for('assess_view', aid=a.id) }}"><b>{{ a.date|roc }}</b>　{{ 'D61 職能治療評估' if a.type=='D61' else '六力 ICOPE 評估' }}</a>
+        <span class="muted small">{{ a.kind }}・{{ a.assessor }}</span>
+        {% if a.type=='ICOPE' %}{% set ab = S.icope_abnormal(a.data) %}<div class="small">{% if ab %}異常：{% for x in ab %}<span class="b 異常">{{ x }}</span> {% endfor %}{% else %}<span class="b 正常">六力皆正常</span>{% endif %}</div>
+        {% elif not a.keyed %}<span class="b warn">未登打 care99</span>{% endif %}
+      {% endif %}
+    </li>
+  {% else %}<li class="hist">尚無評估紀錄</li>{% endfor %}
+  </ul>
+</div>
+</div>
+
+{% if trend.dates %}
+<div class="card">
+  <h2>六力歷次結果</h2>
+  <div class="tbl-wrap"><table class="t trend">
+    <tr><th>面向</th>{% for d in trend.dates %}<th class="c">{{ d|roc }}</th>{% endfor %}</tr>
+    {% for lbl, vals in trend.rows %}<tr><td><b>{{ lbl }}</b></td>{% for v in vals %}<td class="c">{% if v %}<span class="b {{ v }}">{{ v }}</span>{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
+    <tr><td><b>起立坐下（秒）</b><div class="small muted">標準 ≤12 秒</div></td>{% for v in trend.secs %}<td class="c">{% if v is not none %}<b style="color:{{ '#c0392b' if v>12 else '#2e7d4f' }}">{{ '%g'|format(v) }}</b>{% else %}—{% endif %}</td>{% endfor %}</tr>
+  </table></div>
+</div>
+{% endif %}
+
+{% if d61trend.dates %}
+<div class="card">
+  <h2>D61 歷次比較</h2>
+  {% if changes %}<div class="src">最近兩次的變化：
+    <ul class="changes" style="margin:4px 0 0">{% for lbl, a1, a2, k in changes %}<li class="{{ k }}">{{ lbl }}：{{ a1 }} → <b>{{ a2 }}</b>（{{ k }}）</li>{% endfor %}</ul></div>{% endif %}
+  <div class="tbl-wrap"><table class="t trend">
+    <tr><th>項目</th>{% for d in d61trend.dates %}<th class="c">{{ d|roc }}</th>{% endfor %}</tr>
+    {% for lbl, vals, opts in d61trend.rows %}<tr><td>{{ lbl }}</td>{% for v in vals %}<td class="c">{% if opts and v and v != opts[0] %}<span class="b bad">{{ v }}</span>{% else %}{{ v or '—' }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>B9 輔具使用</h2>
+  {% if aids %}<div class="tbl-wrap"><table class="t">
+    <tr><th>輔具</th><th>類別</th><th>來源</th><th>開始使用</th><th>適配評估</th><th>使用訓練</th><th>最近檢查</th><th>狀態</th><th>備註</th><th></th></tr>
+    {% for x in aids %}<tr>
+      <td><b>{{ x.item }}</b></td><td>{{ x.category }}</td><td>{{ x.source or '—' }}</td>
+      {% for k in ['start_date','fit_date','train_date','check_date'] %}<td>{% if x[k] %}{{ x[k]|roc }}{% elif x.status=='使用中' and k!='check_date' %}<span class="b warn">待補</span>{% else %}—{% endif %}</td>{% endfor %}
+      <td>{{ x.status }}</td><td class="small">{{ x.note or '' }}</td>
+      <td><details><summary class="btn sm">編輯</summary>{% with x=x, cs=None, cid=c.id %}{% include "_aid_form.html" %}{% endwith %}
+        <form method="post" action="{{ url_for('aid_delete', xid=x.id) }}" onsubmit="return confirm('確定刪除此輔具紀錄？')"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm danger">刪除</button></form></details></td>
+    </tr>{% endfor %}
+  </table></div>{% endif %}
+  <details class="box" style="margin-top:8px"><summary>＋ 新增輔具</summary>{% with x={}, cs=None, cid=c.id %}{% include "_aid_form.html" %}{% endwith %}</details>
+</div>
+
+<div class="card">
+  <h2>B10 自立支援／復能目標</h2>
+  {% for gl in goals %}
+  <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+    <div><span class="b {{ 'ok' if gl.status=='達成' else ('info' if gl.status=='進行中' else '') }}">{{ gl.status }}</span> <b>【{{ gl.domain }}】{{ gl.goal }}</b></div>
+    <div class="small muted">方法：{{ gl.method or '—' }}｜基準：{{ gl.baseline or '—' }}｜開始 {{ gl.start_date|roc }}｜檢討日 {{ gl.review_date|roc or '—' }}</div>
+    {% if gl.reviews %}<ul class="small" style="margin:6px 0">{% for r in gl.reviews %}<li>{{ r.date|roc }} <span class="b {{ r.progress }}">{{ r.progress }}</span> {{ r.note }} <span class="muted">{{ r.reviewer }}</span></li>{% endfor %}</ul>{% endif %}
+    {% if gl.status=='進行中' %}{% with back=back %}{% include "_review_form.html" %}{% endwith %}{% endif %}
+    <details><summary class="small muted">編輯／刪除</summary>{% with x=gl, cs=None, cid=c.id %}{% include "_goal_form.html" %}{% endwith %}
+      <form method="post" action="{{ url_for('goal_delete', xid=gl.id) }}" onsubmit="return confirm('確定刪除此目標與檢討紀錄？')"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm danger">刪除目標</button></form></details>
+  </div>
+  {% else %}<div class="muted">尚未建立目標。{% if icopes %}可從 <a href="{{ url_for('goals_from_icope', aid=icopes[0].id) }}">最近一次六力結果自動建議目標</a>。{% endif %}</div>{% endfor %}
+  <details class="box"><summary>＋ 新增目標</summary>{% with x={}, cs=None, cid=c.id %}{% include "_goal_form.html" %}{% endwith %}</details>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "print_base.html" %}
+{% block title %}職能治療評估（{{ c.name }} {{ a.date|roc }}）{% endblock %}
+{% block css %}
+  .main .no { width: 8mm; text-align: center; vertical-align: middle; }
+  .main .topic { width: 16mm; text-align: center; vertical-align: middle; font-weight: 600; }
+  .main .note { word-break: break-all; font-size: 8.5pt; color: #0b3d91; }
+  .other { font-size: 9.5pt; margin-bottom: 1mm; }
+{% endblock %}
+{% block body %}
+{% set d = a.data %}
+<div class="page">
+  <header><div class="org">{{ setting('center_name') }}</div><h1>職能治療評估表</h1></header>
+  <table class="info">
+    <tr><th>評估對象</th><td class="v">{{ c.label }}{% if c.gender or c.age %}　<span class="sm">{{ c.gender }}／{{ c.age }} 歲</span>{% endif %}</td>
+        <th>評估日期</th><td style="width:52mm"><span class="v">{{ a.date|roc_long }}</span></td></tr>
+    <tr><th>填表人</th><td class="v">{{ a.assessor }}</td><th>評估類別</th><td class="v">{{ a.kind }}</td></tr>
+    <tr><th>整體評估<br>建議</th><td colspan="3" class="v sm" style="line-height:1.55">{{ a.summary }}</td></tr>
+    <tr><th>備註</th><td colspan="3" class="v sm">{{ a.note }}</td></tr>
+  </table>
+  <table class="main mt" style="table-layout:fixed"><colgroup><col style="width:8mm"><col style="width:15mm"><col><col style="width:30mm"></colgroup>
+    <thead><tr><th class="no">序號</th><th class="topic">主題</th><th>評估項目</th><th class="note" style="color:#000">備註</th></tr></thead>
+    <tbody>
+    {% for sec in S.D61 %}
+      {% set radios = sec.fields|selectattr('type','equalto','radio')|list %}
+      {% set notes = [] %}
+      <tr><td class="no">{{ sec.no }}</td><td class="topic">{{ sec.title|replace('治療目標計畫','治療<br>目標<br>計畫')|replace('個別日常職能活動安排','個別<br>日常<br>職能<br>活動<br>安排')|safe }}</td>
+      <td>
+        {% if radios %}<div class="grid2" {% if sec.no=='08' %}style="grid-template-columns:1fr 1fr 1fr"{% endif %}>
+          {% for f in radios %}<div><span class="lbl" {% if sec.no=='08' %}style="min-width:9mm"{% endif %}>{{ f.label }}</span><div class="opts">{% for o in f.options %}<span class="{{ 'on' if d.get(f.key)==o }}">{{ o }}</span>{% endfor %}</div></div>{% endfor %}
+        </div>{% endif %}
+        {% for f in sec.fields if f.type != 'radio' %}
+          {% if f.type == 'multi' %}
+            <div class="sub">{{ f.label }}{% if f.hint %} <small>（{{ f.hint }}）</small>{% endif %}</div>
+            <div class="opts">{% for o in f.options %}<span class="{{ 'on' if o in (d.get(f.key) or []) }}">{{ o }}</span>{% endfor %}</div>
+            {% if f.other %}<div class="other">其他：<b class="v">{{ d.get(f.key+'_other','') }}</b></div>{% endif %}
+          {% else %}
+            <div style="display:flex;gap:3mm;border-bottom:1px solid #000;min-height:7mm;align-items:flex-end"><b style="width:12mm">{{ f.label }}</b><span class="v sm">{{ d.get(f.key,'') }}</span></div>
+          {% endif %}
+        {% endfor %}
+      </td>
+      <td class="note">{% for f in sec.fields if d.get(f.key+'_note') %}{{ f.label }}：{{ d.get(f.key+'_note') }}<br>{% endfor %}{{ d.get('s'+sec.no+'_note','') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="sign"><span>職能治療師簽章：</span><span>主管覆核：</span></div>
+  <div class="foot">對應系統：care99 D61.職能治療評估　｜　下次再評估：{{ a.next_due|roc }}</div>
+</div>
+{% endblock %}

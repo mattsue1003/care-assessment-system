@@ -1,0 +1,8 @@
+<form method="post" action="{{ url_for('goal_review', xid=gl.id) }}" class="fr" style="margin:6px 0">
+  <input type="hidden" name="back" value="{{ back }}">
+  <div><label class="f">檢討日</label><input type="date" name="date" value="{{ today() }}"></div>
+  <div><label class="f">進展</label><select name="progress">{% for s in ['進步','維持','退步','達成','未達成停止'] %}<option>{{ s }}</option>{% endfor %}</select></div>
+  <div style="flex:1 1 240px"><label class="f">說明（具體表現）</label><input type="text" name="note" placeholder="例：坐站 5 次 13.2 秒，仍需扶手"></div>
+  <div><label class="f">下次檢討</label><input type="date" name="next_review"></div>
+  <div><button class="btn">＋ 新增檢討</button></div>
+</form>

@@ -1,0 +1,43 @@
+{% extends "print_base.html" %}
+{% block title %}個案評估彙整（{{ c.name }}）{% endblock %}
+{% block css %} h2 { font-size: 12.5pt; margin: 5mm 0 1.5mm; border-left: 4px solid #1f6e5c; padding-left: 2mm; } .t td, .t th { font-size: 9.3pt; } {% endblock %}
+{% block body %}
+<div class="page">
+  <header><div class="org">{{ setting('center_name') }}</div><h1>個案職能治療評估彙整</h1><div class="sub">製表日期：{{ today()|roc_long }}</div></header>
+  <table class="info">
+    <tr><th>姓名</th><td class="v">{{ c.name }}</td><th>案號</th><td class="v">{{ c.case_no }}</td><th>性別／年齡</th><td class="v">{{ c.gender }}／{{ c.age }} 歲</td></tr>
+    <tr><th>出生日期</th><td>{{ c.birth|roc }}</td><th>現有服務</th><td>{{ c.services }}</td><th>主責督導</th><td>{{ c.supervisor }}</td></tr>
+    <tr><th>最近評估</th><td>{{ due.last|roc }}</td><th>下次應評估</th><td class="{{ 'bad' if due.status=='逾期' }}">{{ due.next|roc }}（{{ due.status }}）</td><th>居住情況</th><td>{{ c.living }}</td></tr>
+  </table>
+
+  <h2>一、歷次評估一覽（評鑑 B1）</h2>
+  <table class="t"><thead><tr><th style="width:20mm">日期</th><th style="width:30mm">評估</th><th style="width:20mm">評估者</th><th>摘要</th></tr></thead>
+  {% for a in allas %}<tr><td class="c">{{ a.date|roc }}</td>
+    <td>{{ {'D61':'D61 職能治療評估','ICOPE':'六力 ICOPE','D61_HIST':'D61（歷史）','ICOPE_HIST':'六力（歷史）'}[a.type] }}</td><td>{{ a.assessor }}</td>
+    <td class="sm">{% if a.type=='ICOPE' %}{% set ab=S.icope_abnormal(a.data) %}異常：{{ ab|join('、') or '無' }}{% if a.data.mob_seconds %}；起立坐下 {{ a.data.mob_seconds }} 秒{% endif %}
+      {% else %}{{ (a.summary or a.note or '')[:150] }}{{ '…' if (a.summary or '')|length > 150 }}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="4" class="c">尚無紀錄</td></tr>{% endfor %}</table>
+
+  {% if trend.dates %}<h2>二、六力歷次結果</h2>
+  <table class="t"><thead><tr><th>面向</th>{% for d in trend.dates %}<th class="c">{{ d|roc }}</th>{% endfor %}</tr></thead>
+  {% for lbl, vals in trend.rows %}<tr><td><b>{{ lbl }}</b></td>{% for v in vals %}<td class="c {{ 'bad' if v in ('異常','需追蹤') }}">{{ v or '—' }}</td>{% endfor %}</tr>{% endfor %}
+  <tr><td><b>起立坐下（秒）</b></td>{% for v in trend.secs %}<td class="c {{ 'bad' if v and v>12 }}">{{ '%g'|format(v) if v is not none else '—' }}</td>{% endfor %}</tr></table>{% endif %}
+
+  {% if d61trend.dates %}<h2>三、D61 職能治療評估歷次比較</h2>
+  <table class="t"><thead><tr><th>項目</th>{% for d in d61trend.dates %}<th class="c">{{ d|roc }}</th>{% endfor %}</tr></thead>
+  {% for lbl, vals, opts in d61trend.rows %}<tr><td>{{ lbl }}</td>{% for v in vals %}<td class="c {{ 'bad' if opts and v and v != opts[0] }}">{{ v or '—' }}</td>{% endfor %}</tr>{% endfor %}</table>
+  {% if changes %}<div class="sm" style="margin-top:2mm"><b>最近兩次變化：</b>{% for lbl, a1, a2, k in changes %}{{ lbl }} {{ a1 }}→{{ a2 }}（{{ k }}）{{ '；' if not loop.last }}{% endfor %}</div>{% endif %}{% endif %}
+
+  <h2>四、輔具使用（評鑑 B9）</h2>
+  <table class="t"><thead><tr><th>輔具</th><th>來源</th><th>開始使用</th><th>適配評估</th><th>使用訓練</th><th>最近檢查</th><th>狀態</th><th>備註</th></tr></thead>
+  {% for x in aids %}<tr><td><b>{{ x.item }}</b></td><td>{{ x.source }}</td>{% for k in ['start_date','fit_date','train_date','check_date'] %}<td class="c">{{ x[k]|roc or '—' }}</td>{% endfor %}<td>{{ x.status }}</td><td class="sm">{{ x.note }}</td></tr>
+  {% else %}<tr><td colspan="8" class="c">無使用輔具</td></tr>{% endfor %}</table>
+
+  <h2>五、自立支援／復能目標（評鑑 B10）</h2>
+  <table class="t"><thead><tr><th style="width:22mm">面向</th><th>目標／方法</th><th style="width:20mm">開始</th><th>檢討紀錄</th><th style="width:17mm">狀態</th></tr></thead>
+  {% for gl in goals %}<tr><td>{{ gl.domain }}</td><td><b>{{ gl.goal }}</b><div class="sm">方法：{{ gl.method }}</div><div class="sm">基準：{{ gl.baseline }}</div></td>
+    <td class="c">{{ gl.start_date|roc }}</td><td class="sm">{% for r in gl.reviews %}<div>{{ r.date|roc }} {{ r.progress }}：{{ r.note }}</div>{% else %}—{% endfor %}</td><td class="c">{{ gl.status }}</td></tr>
+  {% else %}<tr><td colspan="5" class="c">尚未建立目標</td></tr>{% endfor %}</table>
+  <div class="sign"><span>職能治療師：</span><span>督導（護理師）：</span><span>主管：</span></div>
+</div>
+{% endblock %}

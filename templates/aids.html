@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>B2c 輔具管理 <span class="small muted">（評鑑 B9）</span></h1>
+<div class="muted">評鑑佐證需有：開始使用日、適配評估、使用訓練；定期檢查保養</div></div><span class="sp"></span>
+<div class="btns"><a class="btn {{ 'pri' if miss }}" href="?miss=1">只看待補資料</a><a class="btn" href="?">全部</a>
+<a class="btn" href="{{ url_for('print_list', kind='aids') }}" target="_blank">🖨 列印清單</a></div></div>
+<details class="card box"><summary>＋ 新增輔具</summary>{% with x={}, back=url_for('aids') %}{% include "_aid_form.html" %}{% endwith %}</details>
+<div class="tbl-wrap"><table class="t">
+<tr><th>案號</th><th>姓名</th><th>輔具／用品</th><th>類別</th><th>來源</th><th>開始使用</th><th>適配評估</th><th>使用訓練</th><th>最近檢查</th><th>狀態</th><th>備註</th><th></th></tr>
+{% for x in rows %}<tr>
+  <td>{{ x.case_no }}</td><td><a href="{{ url_for('client_view', cid=x.client_id) }}">{{ x.name }}</a></td><td><b>{{ x.item }}</b></td><td>{{ x.category }}</td><td>{{ x.source or '—' }}</td>
+  {% for k in ['start_date','fit_date','train_date','check_date'] %}<td>{% if x[k] %}{{ x[k]|roc }}{% elif x.status=='使用中' and k!='check_date' %}<span class="b warn">待補</span>{% else %}—{% endif %}</td>{% endfor %}
+  <td>{{ x.status }}</td><td class="small">{{ x.note or '' }}</td>
+  <td><details><summary class="btn sm">編輯</summary>{% with x=x, cs=None, cid=x.client_id, back=request.full_path %}{% include "_aid_form.html" %}{% endwith %}</details></td>
+</tr>{% else %}<tr><td colspan="12" class="empty">沒有資料</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

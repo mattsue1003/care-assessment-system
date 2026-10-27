@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="pagehead"><div><h1>{{ 'D61 職能治療評估' if typ=='D61' else '六力 ICOPE 評估' }}</h1><div class="muted">共 {{ rows|length }} 筆</div></div>
+<span class="sp"></span><a class="btn pri" href="{{ url_for('assess_edit', typ=typ|lower) }}">＋ 新增資料</a></div>
+<form class="card fr" method="get">
+  <div><label class="f">評估日期</label><span><input type="date" name="from" value="{{ f }}"> 至 <input type="date" name="to" value="{{ t }}"></span></div>
+  <div><label class="f">評估對象／填表人</label><input type="search" name="q" value="{{ q }}"></div>
+  <div><button class="btn pri">🔍 查詢</button></div>
+  <div><a class="btn" href="?">重新設定</a></div>
+</form>
+<div class="tbl-wrap"><table class="t">
+<tr><th>評估日期</th><th>評估對象</th><th>填表人</th><th>類別</th>
+{% if typ=='D61' %}<th>整體評估建議</th><th>care99</th>{% else %}<th>異常面向</th><th>下次再評估</th>{% endif %}<th></th></tr>
+{% for r in rows %}<tr>
+  <td>{{ r.date|roc }}</td><td><a href="{{ url_for('client_view', cid=r.client_id) }}">{{ r.name }}</a> <span class="muted small">{{ r.case_no }}</span></td>
+  <td>{{ r.assessor }}</td><td>{{ r.kind }}</td>
+  {% if 'HIST' in r.type %}<td colspan="2" class="muted small">{{ r.note }}</td><td></td>
+  {% else %}
+    {% if typ=='D61' %}<td class="small" style="max-width:520px">{{ (r.summary or '')[:90] }}{{ '…' if (r.summary or '')|length > 90 }}</td>
+      <td>{% if r.keyed %}<span class="b ok">已登打</span>{% else %}<span class="b warn">未登打</span>{% endif %}</td>
+    {% else %}<td>{% for x in r.abn %}<span class="b 異常">{{ x }}</span> {% else %}<span class="b 正常">皆正常</span>{% endfor %}</td><td>{{ r.next_due|roc }}</td>{% endif %}
+    <td class="btns"><a class="btn sm" href="{{ url_for('assess_view', aid=r.id) }}">檢視</a><a class="btn sm" href="{{ url_for('assess_edit', typ=typ|lower, aid=r.id) }}">修改</a></td>
+  {% endif %}
+</tr>{% else %}<tr><td colspan="7" class="empty">查無資料</td></tr>{% endfor %}
+</table></div>
+{% endblock %}
