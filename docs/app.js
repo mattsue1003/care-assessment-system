@@ -912,7 +912,7 @@ function hvRefresh() { const f = document.getElementById('f'); if (!f || f.datas
 
 /* ============================== 列印版面（預覽、PDF、Word 共用） ============================== */
 let PRINT_CSS = '';
-fetch('print.css?v=3').then(r => r.text()).then(t => { PRINT_CSS = t; }).catch(() => {});
+fetch('print.css?v=4').then(r => r.text()).then(t => { PRINT_CSS = t; }).catch(() => {});
 const o = (sel, opts) => opts.map(x => `<span class="o ${x === sel || (Array.isArray(sel) && sel.includes(x)) ? 'on' : ''}">${x === sel || (Array.isArray(sel) && sel.includes(x)) ? '☑' : '□'} ${h(x)}</span>`).join('');
 const boxes = t => h(t).replace(/☑([^　☐☑（\s]+)/g, '<b class="v o">☑$1</b>').replace(/☐([^　☐☑（\s<]+)/g, '<span class="o">☐$1</span>');
 const nl = t => h(t).replace(/\n/g, '<br>');
