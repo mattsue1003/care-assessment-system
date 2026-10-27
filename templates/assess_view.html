@@ -11,8 +11,14 @@
     <a class="btn pri" href="{{ url_for('export_assess', aid=a.id, fmt='docx') }}">Word</a>
   </div>
 </div>
-<div class="grid g2" style="grid-template-columns: 1fr 340px">
-<div class="card" style="padding:0;overflow:hidden"><iframe src="{{ url_for('print_assess', aid=a.id) }}" style="width:100%;height:80vh;border:0;background:#888"></iframe></div>
+<div class="grid view-grid">
+<div class="card show-m">
+  <a class="btn pri" style="width:100%;justify-content:center" href="{{ url_for('print_assess', aid=a.id) }}" target="_blank">📄 全螢幕預覽表單（可雙指放大）</a>
+  {% if a.type=='D61' %}<h3 style="margin-top:14px">整體評估建議</h3><p style="white-space:pre-wrap;margin:0">{{ a.summary or '（未填）' }}</p>
+  {% else %}<h3 style="margin-top:14px">職能治療處置建議</h3><p style="white-space:pre-wrap;margin:0">{{ a.data.get('plan_text') or '（未填）' }}</p>{% endif %}
+  <p class="small muted" style="margin:8px 0 0">下次再評估：{{ a.next_due|roc or '—' }}</p>
+</div>
+<div class="card frame-card hide-m" style="padding:0;overflow:hidden"><iframe src="{{ url_for('print_assess', aid=a.id) }}" class="preview"></iframe></div>
 <div>
   {% if a.type=='D61' %}
   <div class="card">

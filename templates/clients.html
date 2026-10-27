@@ -11,10 +11,10 @@
 <div class="tbl-wrap"><table class="t">
 <tr><th>案號</th><th>姓名</th><th>性別</th><th class="c">年齡</th><th>現有服務</th><th>最近 D61</th><th>最近六力</th><th>下次應評估</th><th>狀態</th><th></th></tr>
 {% for c in cs %}<tr>
-  <td>{{ c.case_no }}</td><td><a href="{{ url_for('client_view', cid=c.id) }}"><b>{{ c.name }}</b></a></td><td>{{ c.gender }}</td><td class="c">{{ c.age or '' }}</td>
-  <td class="small">{{ c.services }}</td><td>{{ c.due.last_d61|roc or '—' }}</td><td>{{ c.due.last_icope|roc or '—' }}</td>
+  <td class="hide-m">{{ c.case_no }}</td><td class="ttl"><a href="{{ url_for('client_view', cid=c.id) }}"><b>{{ c.name }}</b></a> <span class="m-only muted small">{{ c.case_no }}・{{ c.gender }}・{{ c.age or '?' }} 歲</span></td><td class="hide-m">{{ c.gender }}</td><td class="c hide-m">{{ c.age or '' }}</td>
+  <td class="small hide-m">{{ c.services }}</td><td>{{ c.due.last_d61|roc or '—' }}</td><td>{{ c.due.last_icope|roc or '—' }}</td>
   <td>{{ c.due.next|roc or '—' }}</td><td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
-  <td class="btns"><a class="btn sm" href="{{ url_for('assess_edit', typ='icope', client=c.id) }}">六力</a><a class="btn sm" href="{{ url_for('assess_edit', typ='d61', client=c.id, **({'from':'icope'} if c.due.last_icope else {})) }}">D61</a></td>
+  <td class="btns wide"><a class="btn sm" href="{{ url_for('assess_edit', typ='icope', client=c.id) }}">六力</a><a class="btn sm" href="{{ url_for('assess_edit', typ='d61', client=c.id, **({'from':'icope'} if c.due.last_icope else {})) }}">D61</a></td>
 </tr>{% else %}<tr><td colspan="10" class="empty">沒有資料。可到「設定」從 Excel 名冊匯入。</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

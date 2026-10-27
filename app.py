@@ -167,7 +167,8 @@ def boxes(text):
 
 
 app.jinja_env.filters.update(roc=roc, roc_long=roc_long, boxes=boxes)
-app.jinja_env.globals.update(S=S, today=lambda: date.today().isoformat())
+app.jinja_env.globals.update(S=S, today=lambda: date.today().isoformat(),
+                             css_ver=lambda: int(os.path.getmtime(os.path.join(BASE, "static", "app.css"))))
 
 
 # ================================================================== 資料存取
@@ -273,7 +274,7 @@ def login():
         if u and check_password_hash(u["pw_hash"], request.form.get("password", "")):
             session.clear()
             session.update(uid=u["id"], name=u["name"], title=u["title"] or "", role=u["role"])
-            if check_password_hash(u["pw_hash"], DEFAULT_PASSWORD):
+            if not DEMO and check_password_hash(u["pw_hash"], DEFAULT_PASSWORD):
                 flash("目前仍使用預設密碼 1111，請到「設定」修改密碼", "err")
             log("登入")
             db().commit()

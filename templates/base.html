@@ -4,23 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}福喜緣照護評估系統{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=css_ver()) }}">
 </head>
 <body>
 {% set ep = request.endpoint %}
 {% set typ = (request.view_args or {}).get('typ', '')|lower %}
 <div class="top">
-  <div class="logo"><i>福</i>照護評估系統</div>
-  <span class="small">單位：{{ center }}</span>
-  {% if demo %}<span class="b warn" style="background:#ffe9a8">示範版｜資料皆為假名</span>{% endif %}
+  <button class="menu-btn" type="button" aria-label="開啟選單" onclick="document.body.classList.toggle('nav-open')">☰</button>
+  <a class="logo" href="{{ url_for('home') }}"><i>福</i><span>照護評估系統</span></a>
+  <span class="small hide-m">單位：{{ center }}</span>
+  {% if demo %}<span class="b demo-tag">示範版<span class="hide-m">｜資料皆為假名</span></span>{% endif %}
   <span class="sp"></span>
-  <a class="btn sm acc" href="{{ url_for('feedback', page=request.path) }}" style="color:#fff">💬 意見回饋</a>
-  <span class="small">用戶：{{ me.name }}{% if me.title %}（{{ me.title }}）{% endif %}</span>
-  <a class="small" href="{{ url_for('logout') }}">登出</a>
+  <a class="btn sm acc fb-btn" href="{{ url_for('feedback', page=request.path) }}">💬<span class="hide-m"> 意見回饋</span></a>
+  <span class="small hide-m">{{ me.name }}{% if me.title %}（{{ me.title }}）{% endif %}</span>
+  <a class="small hide-m" href="{{ url_for('logout') }}">登出</a>
 </div>
+<div class="nav-mask" onclick="document.body.classList.remove('nav-open')"></div>
 <div class="wrap">
 <nav class="side">
-  <a href="{{ url_for('home') }}" class="{{ 'on' if ep=='home' }}">🏠 <span>首頁／待辦</span></a>
+  <div class="side-me show-m"><b>{{ me.name }}</b> <span class="muted small">{{ me.title }}</span><div class="small muted">{{ center }}</div></div>
+  <a href="{{ url_for('home') }}" class="{{ 'on' if ep=='home' }}"><code>🏠</code><span>首頁／待辦</span></a>
   <div class="grp">基本資料</div>
   <a href="{{ url_for('clients') }}" class="{{ 'on' if ep in ('clients','client_view','client_edit') }}"><code>B2</code><span>個案名冊</span></a>
   <a href="{{ url_for('aids') }}" class="{{ 'on' if ep=='aids' }}"><code>B2c</code><span>輔具管理</span></a>
@@ -30,10 +33,11 @@
   <div class="grp">自立支援</div>
   <a href="{{ url_for('goals') }}" class="{{ 'on' if ep in ('goals','goals_from_icope') }}"><code>B10</code><span>復能目標追蹤</span></a>
   <div class="grp">評鑑與報表</div>
-  <a href="{{ url_for('reports') }}" class="{{ 'on' if ep=='reports' }}">📦 <span>評鑑佐證／匯出</span></a>
+  <a href="{{ url_for('reports') }}" class="{{ 'on' if ep=='reports' }}"><code>📦</code><span>評鑑佐證／匯出</span></a>
   <div class="grp">系統</div>
-  <a href="{{ url_for('feedback') }}" class="{{ 'on' if ep=='feedback' }}">💬 <span>試用意見回饋</span></a>
-  <a href="{{ url_for('settings') }}" class="{{ 'on' if ep=='settings' }}">⚙️ <span>設定／匯入／備份</span></a>
+  <a href="{{ url_for('feedback') }}" class="{{ 'on' if ep=='feedback' }}"><code>💬</code><span>試用意見回饋</span></a>
+  <a href="{{ url_for('settings') }}" class="{{ 'on' if ep=='settings' }}"><code>⚙️</code><span>設定／匯入／備份</span></a>
+  <a href="{{ url_for('logout') }}" class="show-m"><code>↩︎</code><span>登出</span></a>
 </nav>
 <main>
   {% with msgs = get_flashed_messages(with_categories=true) %}
@@ -42,6 +46,24 @@
   {% block body %}{% endblock %}
 </main>
 </div>
+<nav class="tabbar">
+  <a href="{{ url_for('home') }}" class="{{ 'on' if ep=='home' }}"><b>🏠</b>首頁</a>
+  <a href="{{ url_for('clients') }}" class="{{ 'on' if ep in ('clients','client_view','client_edit') }}"><b>👥</b>個案</a>
+  <a href="{{ url_for('assess_list', typ='icope') }}" class="{{ 'on' if typ=='icope' }}"><b>🧭</b>六力</a>
+  <a href="{{ url_for('assess_list', typ='d61') }}" class="{{ 'on' if typ=='d61' }}"><b>📝</b>D61</a>
+  <a href="#" onclick="document.body.classList.add('nav-open');return false"><b>☰</b>更多</a>
+</nav>
+<script>
+/* 表格在手機上改成卡片：自動把表頭文字加到每個欄位 */
+document.querySelectorAll('table.t:not(.trend)').forEach(t => {
+  const hdr = [...t.rows].find(r => r.querySelector('th')); if (!hdr) return;
+  hdr.classList.add('hdr');
+  const labels = [...hdr.cells].map(c => c.textContent.trim());
+  [...t.rows].forEach(r => { if (r === hdr) return; let i = 0;
+    [...r.cells].forEach(td => { td.dataset.label = (td.colSpan > 1) ? '' : (labels[i] || ''); i += td.colSpan || 1; }); });
+  t.classList.add('cards');
+});
+</script>
 {% block script %}{% endblock %}
 </body>
 </html>

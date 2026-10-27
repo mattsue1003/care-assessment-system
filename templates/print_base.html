@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{% endblock %}</title>
 <style>
   @page { size: A4 {% block orient %}{% endblock %}; margin: 10mm 12mm; }
@@ -45,12 +46,19 @@
     .page { background: #fff; width: 210mm; margin: 6mm auto; padding: 10mm 12mm; box-shadow: 0 2px 10px rgba(0,0,0,.4); min-height: 297mm; }
     .land .page { width: 297mm; min-height: 210mm; }
   }
-  @media print { .bar { display: none; } }
+  @media print { .bar { display: none; } body { zoom: 1 !important; } }
+  @media screen and (max-width: 860px) { .page { margin: 3mm auto; } .bar { font-size: 13px; } }
   {% block css %}{% endblock %}
 </style>
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% if screen %}<div class="bar"><span>預覽（與 PDF 相同版面）</span><span style="flex:1"></span><button onclick="print()">🖨 列印／另存 PDF</button></div>{% endif %}
 {% block body %}{% endblock %}
+{% if screen %}<script>
+/* 手機／窄畫面：把 A4 預覽等比例縮小到畫面寬度（不影響列印與 PDF） */
+(function fit(){ var pageW = document.body.classList.contains('land') ? 1160 : 830;
+  var z = Math.min(1, (window.innerWidth - 4) / pageW);
+  document.body.style.zoom = z < 1 ? z : ''; window.addEventListener('resize', function(){ fit(); }, {once:true}); })();
+</script>{% endif %}
 </body>
 </html>

@@ -49,8 +49,8 @@
   <h2>個案評估彙整（每人一份）</h2>
   <div class="tbl-wrap"><table class="t">
   <tr><th>案號</th><th>姓名</th><th>最近評估</th><th>狀態</th><th>匯出</th></tr>
-  {% for c in cs %}<tr><td>{{ c.case_no }}</td><td>{{ c.name }}</td><td>{{ c.due.last|roc or '—' }}</td><td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
-    <td class="btns"><a class="btn sm" href="{{ url_for('print_client', cid=c.id) }}" target="_blank">預覽</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='pdf') }}">PDF</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='docx') }}">Word</a></td></tr>{% endfor %}
+  {% for c in cs %}<tr><td class="hide-m">{{ c.case_no }}</td><td class="ttl">{{ c.name }} <span class="m-only muted small">{{ c.case_no }}</span></td><td>{{ c.due.last|roc or '—' }}</td><td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
+    <td class="btns wide"><a class="btn sm" href="{{ url_for('print_client', cid=c.id) }}" target="_blank">預覽</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='pdf') }}">PDF</a><a class="btn sm" href="{{ url_for('export_client', cid=c.id, fmt='docx') }}">Word</a></td></tr>{% endfor %}
   </table></div>
 </div>
 {% endblock %}

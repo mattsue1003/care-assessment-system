@@ -8,10 +8,10 @@
 <div class="tbl-wrap"><table class="t">
 <tr><th>個案</th><th>面向</th><th>目標</th><th>方法</th><th>開始</th><th>檢討日</th><th>最近檢討</th><th>狀態</th></tr>
 {% for gl in rows %}<tr>
-  <td><a href="{{ url_for('client_view', cid=gl.client_id) }}">{{ gl.name }}</a> <span class="muted small">{{ gl.case_no }}</span></td>
-  <td>{{ gl.domain }}</td><td><b>{{ gl.goal }}</b><div class="small muted">基準：{{ gl.baseline or '—' }}</div></td><td class="small">{{ gl.method }}</td>
+  <td class="ttl"><a href="{{ url_for('client_view', cid=gl.client_id) }}">{{ gl.name }}</a> <span class="muted small">{{ gl.case_no }}</span></td>
+  <td>{{ gl.domain }}</td><td class="wide"><b>{{ gl.goal }}</b><div class="small muted">基準：{{ gl.baseline or '—' }}</div></td><td class="small wide">{{ gl.method }}</td>
   <td>{{ gl.start_date|roc }}</td><td>{% if gl.overdue %}<span class="b bad">{{ gl.review_date|roc }} 已到期</span>{% else %}{{ gl.review_date|roc }}{% endif %}</td>
-  <td class="small">{% if gl.last %}{{ gl.last.date|roc }} <span class="b {{ gl.last.progress }}">{{ gl.last.progress }}</span> {{ gl.last.note }}{% else %}—{% endif %}
+  <td class="small wide">{% if gl.last %}{{ gl.last.date|roc }} <span class="b {{ gl.last.progress }}">{{ gl.last.progress }}</span> {{ gl.last.note }}{% else %}—{% endif %}
     {% if gl.status=='進行中' %}<details><summary class="small">＋ 檢討</summary>{% with gl=gl, back=request.full_path %}{% include "_review_form.html" %}{% endwith %}</details>{% endif %}</td>
   <td>{{ gl.status }}</td>
 </tr>{% else %}<tr><td colspan="8" class="empty">沒有資料。可從六力評估結果一鍵建立目標。</td></tr>{% endfor %}

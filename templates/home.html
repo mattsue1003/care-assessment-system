@@ -18,7 +18,7 @@
   {% if todo %}
   <table class="t"><tr><th>個案</th><th>最近評估</th><th>應評估日</th><th>狀態</th><th></th></tr>
   {% for c in todo %}<tr>
-    <td><a href="{{ url_for('client_view', cid=c.id) }}">{{ c.label }}</a></td>
+    <td class="ttl"><a href="{{ url_for('client_view', cid=c.id) }}">{{ c.label }}</a></td>
     <td>{{ c.due.last|roc or '—' }}</td><td>{{ c.due.next|roc or '—' }}</td>
     <td><span class="b {{ c.due.status }}">{{ c.due.status }}</span></td>
     <td><a class="btn sm" href="{{ url_for('assess_edit', typ='icope', client=c.id) }}">評估</a></td></tr>{% endfor %}

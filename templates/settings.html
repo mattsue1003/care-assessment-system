@@ -28,7 +28,7 @@
   <h2>帳號</h2>
   <table class="t"><tr><th>帳號</th><th>姓名</th><th>職稱</th><th>權限</th><th>修改（密碼留空表示不變）</th></tr>
   {% for u in users %}<tr><td>{{ u.username }}</td><td>{{ u.name }}</td><td>{{ u.title }}</td><td>{{ '管理者' if u.role=='admin' else '一般' }}{{ '（停用）' if not u.active }}</td>
-    <td><form method="post" action="{{ url_for('user_save') }}" class="fr"><input type="hidden" name="id" value="{{ u.id }}">
+    <td class="wide"><form method="post" action="{{ url_for('user_save') }}" class="fr"><input type="hidden" name="id" value="{{ u.id }}">
       <input type="text" name="name" value="{{ u.name }}" style="width:90px"><input type="text" name="title" value="{{ u.title or '' }}" style="width:110px">
       <input type="password" name="password" placeholder="新密碼" style="width:110px" autocomplete="new-password">
       <select name="active"><option value="1" {{ 'selected' if u.active }}>啟用</option><option value="0" {{ 'selected' if not u.active }}>停用</option></select>
