@@ -3,9 +3,18 @@
 給長照日間照顧中心職能治療師用的**本機**評估系統：六力（ICOPE）評估、D61 職能治療評估、輔具、自立支援目標追蹤，
 並可一鍵匯出評鑑佐證（Word／PDF／Excel）。欄位對照 care99 PCSMS 系統 D61，方便同步登打。
 
-> 資料只存在自己電腦的 `data/care.db`，不會上傳雲端。`data/` 已列入 `.gitignore`，**請勿把正式資料上傳到 GitHub**。
+## 🌐 線上試用（免安裝）
 
-## 快速試用（去識別化示範資料）
+**https://mattsue1003.github.io/care-assessment-system/** 　帳號 **1111**／密碼 **1111**
+
+- 手機、平板、電腦打開就能用；個案全部是去識別化的假名
+- 試用時的修改只存在自己的瀏覽器（各自一份，互不影響）；「設定」可重設回初始示範資料
+- 試用意見：右上角 💬 填寫後按「複製全部意見」，貼到 LINE 傳給治療師
+- 網頁版放在 `docs/`（由 `build_pages.py` 從 `demo/demo.db` 產生資料），PDF 用瀏覽器「列印 → 另存為 PDF」，Word 為 .doc 格式
+
+> 正式使用請用下方 Python 版：資料只存在自己電腦的 `data/care.db`，不會上傳雲端。`data/` 已列入 `.gitignore`，**請勿把正式資料上傳到 GitHub**。
+
+## Python 版（正式使用／本機）
 
 需要 Python 3.10 以上與 Google Chrome（產生 PDF 用）。
 
@@ -18,13 +27,6 @@
 - 預設帳號 **1111**、密碼 **1111**（登入後請到「設定」修改密碼）
 - 示範資料在 `demo/demo.db`：45 位個案皆為**假名**，案號重編、出生日期與評估日期隨機偏移，電話地址等全部刪除
 - 示範版會複製一份到 `data/demo_work.db` 來操作；要還原：`./啟動示範版.command --reset`
-
-## 給單位試用：公開網址
-
-`開啟公開試用.command`（macOS）會在本機跑示範版，並用 Cloudflare 通道產生 `https://xxxx.trycloudflare.com` 公開網址。
-需先把 Cloudflare 官方 [cloudflared](https://github.com/cloudflare/cloudflared/releases) 放到 `tools/cloudflared`。
-電腦要保持開機（程式會防止睡眠）；關掉視窗網址就失效，重開會換新網址。
-示範版（`CARE_DEMO=1`）會關閉名冊匯入與帳號修改，並有「💬 意見回饋」可收集試用意見、匯出 Excel。
 
 ## 功能
 
