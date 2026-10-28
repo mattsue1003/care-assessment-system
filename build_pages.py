@@ -23,6 +23,8 @@ schema = {
     "MNA_SCREEN": M.MNA_SCREEN, "MNA_FULL": M.MNA_FULL, "PROTEIN": M.PROTEIN, "DIET_TEXTURE": M.DIET_TEXTURE,
     "HV_TARGETS": M.HV_TARGETS, "HV_ITEMS": M.HV_ITEMS, "HV_SECTIONS": M.HV_SECTIONS, "HV_PROBLEMS": M.HV_PROBLEMS,
     "HV_ECONOMY": M.HV_ECONOMY, "WEEKDAYS": M.WEEKDAYS, "SERVICE_CODES": M.SERVICE_CODES, "SIMPLE": M.SIMPLE,
+    "DISCIPLINES": M.DISCIPLINES, "PROFESSIONS": M.PROFESSIONS, "DISEASE_CARE": M.DISEASE_CARE, "ACT_TYPES": M.ACT_TYPES,
+    "ACT_CATS": M.ACT_CATS, "ACT_LEVELS": M.ACT_LEVELS, "TRAIN_CATS": M.TRAIN_CATS, "LIB_CATS": M.LIB_CATS,
 }
 with open(os.path.join(DOCS, "schema.js"), "w", encoding="utf-8") as fh:
     fh.write("// 自動產生（build_pages.py），請勿手動修改\nwindow.SCHEMA = " + json.dumps(schema, ensure_ascii=False) + ";\n")

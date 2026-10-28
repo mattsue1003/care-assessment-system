@@ -292,3 +292,9 @@ sup.new { font-size: 9px; color: var(--accent); margin-left: 2px; font-weight: 7
 .score-box b.big { font-size: 34px; display: block; color: var(--brand); }
 
 .hvsec { margin-bottom: 12px; } .hvsec.chgd textarea { background: #fffbea; border-color: #e5b94a; }
+
+/* 跨專業評估／家系圖 */
+.geno-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 0; border-top: 1px dashed var(--line); }
+.geno-row input[type=text] { padding: 4px 6px; min-height: 0; font-size: 14px; }
+.geno-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 900px) { .geno-grid { grid-template-columns: 1fr; } .geno-row input[type=text] { font-size: 16px; } }
