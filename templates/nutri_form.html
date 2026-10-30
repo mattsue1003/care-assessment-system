@@ -17,7 +17,7 @@
 {% if c %}<button class="fab-save" type="submit">💾 儲存</button>{% endif %}
 <div class="grid view-grid">
 <div>
-  <div class="card"><h2>身體測量</h2><div class="fr">
+  <div class="card"><h2>身體測量</h2>{% if data._from_daily %}<div class="src small">已帶入今日照顧紀錄（{{ data._from_daily }}）的每月量測</div>{% endif %}<div class="fr">
     <div><label class="f">身高 cm</label><input type="number" step="0.1" inputmode="decimal" name="height" value="{{ data.height or '' }}"></div>
     <div><label class="f">體重 kg</label><input type="number" step="0.1" inputmode="decimal" name="weight" value="{{ data.weight or '' }}"></div>
     <div><label class="f">BMI（自動）</label><input type="text" id="bmi" readonly style="width:150px;background:#f3f6f5"></div></div></div>

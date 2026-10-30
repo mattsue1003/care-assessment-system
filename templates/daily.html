@@ -10,6 +10,7 @@
   <div><b>{{ day|roc_long }}</b>　<span class="muted">在案 {{ rows|length }} 位・已儲存 {{ saved }} 位</span></div>
   <span style="flex:1"></span>
   <div class="btns"><label class="small"><input type="checkbox" id="onlyAlert"> 只看異常／已修改</label>
+    <label class="small"><input type="checkbox" id="onlyMeas"> 只看本月未量測</label>
     <a class="btn sm" href="{{ url_for('records_list', module='DAILY') }}">歷史紀錄</a></div>
 </div>
 
@@ -30,7 +31,10 @@
       <label>脈搏<input type="number" inputmode="numeric" name="{{ p }}pulse" value="{{ d.pulse or '' }}"></label>
       <label>血壓<span class="bp"><input type="number" inputmode="numeric" name="{{ p }}sbp" value="{{ d.sbp or '' }}" placeholder="收縮">/<input type="number" inputmode="numeric" name="{{ p }}dbp" value="{{ d.dbp or '' }}" placeholder="舒張"></span></label>
       <label class="opt">複測血壓<input type="text" name="{{ p }}bp2" value="{{ d.bp2 or '' }}" placeholder="例 11:50 106/58"></label>
-      <label class="opt">體重<input type="number" step="0.1" inputmode="decimal" name="{{ p }}weight" value="{{ d.weight or '' }}" placeholder="每月"></label>
+      <span class="monthly"><span class="small {{ 'ok-t' if r.meas else 'warn-t' }}">每月量測：{% if r.meas %}本月已量（{{ r.meas.date|roc }}{% for k, l in [('weight','體重'),('mac','臂'),('cc','小腿')] if r.meas.data.get(k) %} {{ l }}{{ r.meas.data[k] }}{% endfor %}）{% else %}本月尚未量{% endif %}</span>
+      <label class="opt">體重 kg<input type="number" step="0.1" inputmode="decimal" name="{{ p }}weight" value="{{ d.weight or '' }}" placeholder="每月"></label>
+      <label class="opt">臂中圍 cm<input type="number" step="0.1" inputmode="decimal" name="{{ p }}mac" value="{{ d.mac or '' }}" placeholder="無法量體重者"></label>
+      <label class="opt">小腿圍 cm<input type="number" step="0.1" inputmode="decimal" name="{{ p }}cc" value="{{ d.cc or '' }}" placeholder="無法量體重者"></label></span>
     </div>
     <div class="sels">
       {% for k, label, typ, opts, grp in M.DAILY_FIELDS if typ == 'sel' %}
@@ -64,6 +68,7 @@ function check(card){
 document.querySelectorAll('.daily').forEach(check);
 document.getElementById('f').addEventListener('input', e => { const c = e.target.closest('.daily'); if (c) check(c); });
 document.getElementById('f').addEventListener('change', e => { const c = e.target.closest('.daily'); if (c) check(c); });
+document.getElementById('onlyMeas').addEventListener('change', e => document.querySelectorAll('.daily').forEach(c => c.style.display = (e.target.checked && c.querySelector('.monthly .ok-t')) ? 'none' : ''));
 document.getElementById('onlyAlert').addEventListener('change', e => document.querySelectorAll('.daily').forEach(c => c.style.display = (e.target.checked && !c.dataset.flag) ? 'none' : ''));
 </script>
 {% endblock %}

@@ -693,6 +693,7 @@ function monthSummary(cid, ym) {
   const t = rng('temp'), sb = rng('sbp'), db = rng('dbp'), pu = rng('pulse'); const vit = [];
   if (t) vit.push(`體溫介於 ${t[0]}–${t[1]}℃`); if (sb && db) vit.push(`血壓介於 ${sb[0]}–${sb[1]}／${db[0]}–${db[1]} mmHg`); if (pu) vit.push(`脈搏 ${pu[0]}–${pu[1]} 次/分`);
   if (vit.length) o.push('量測生命徵象' + vit.join('，') + '。'); const al = pres.filter(r => dailyAlerts(r).length).length; if (al) o.push(`本月有 ${al} 天生命徵象或狀況異常，已通知護理師追蹤。`);
+  const ms = pres.filter(r => r.weight || r.mac || r.cc).slice(-1)[0]; if (ms) o.push('本月量測：' + [['weight', '體重', 'kg'], ['mac', '臂中圍', 'cm'], ['cc', '小腿圍', 'cm']].filter(([k]) => ms[k]).map(([k, l, u]) => `${l} ${ms[k]} ${u}`).join('、') + '。');
   if (most('activity').length) o.push(`活動參與多為${most('activity').join('、')}。`);
   const eh = most('eat_help')[0], ea = most('eat_amt')[0], wa = most('water_amt')[0]; if (eh || wa) o.push(`飲食多為${eh || ''}${ea ? '、' + ea : ''}${wa ? `；飲水約 ${wa} c.c.` : ''}。`);
   if (most('mood').length) o.push(`精神多為${most('mental').join('、')}，情緒多為${most('mood').join('、')}。`);
@@ -738,8 +739,10 @@ function dailyAlerts(d) {
   if (t !== null && t >= 37.5) o.push('體溫 ' + t); if (s !== null && (s >= 160 || s < 90)) o.push('收縮壓 ' + s);
   if (di !== null && di >= 100) o.push('舒張壓 ' + di); if (p !== null && (p > 100 || p < 50)) o.push('脈搏 ' + p);
   if (['焦慮不安', '易發怒'].includes(d.mood)) o.push('情緒' + d.mood); if (['吃完3分', '未進食'].includes(d.eat_amt)) o.push('進食' + d.eat_amt);
+  const m = n('mac'), cc = n('cc'); if (m !== null && m < 21) o.push('臂中圍 ' + m + ' 偏低'); if (cc !== null && cc < 31) o.push('小腿圍 ' + cc + ' 偏低');
   if (d.stool === '3次以上') o.push('大便 3 次以上'); return o;
 }
+function monthMeasure(cid, day) { return recs('DAILY', cid).find(r => r.date.startsWith(day.slice(0, 7)) && (r.data.weight || r.data.mac || r.data.cc)); }
 function usualDaily(cid) {
   const rows = recs('DAILY', cid).slice(0, 20).map(r => r.data); const out = Object.assign({}, S.DAILY_DEFAULT);
   Object.keys(S.DAILY_DEFAULT).forEach(k => { const c = {}; rows.forEach(r => { if (r[k] && r[k] !== '未記錄') c[r[k]] = (c[r[k]] || 0) + 1; });
@@ -799,12 +802,15 @@ V.daily = (q) => {
         <a href="#/clients/${c.id}"><b>${h(c.name)}</b></a> <span class="muted small">${h(c.case_no)}</span>${ex ? ' ' + badge('已存', 'ok') : ''}<span class="alerts">${ex ? dailyAlerts(d).map(a => badge(a, 'bad')).join(' ') : ''}</span></div>
       <div class="dgrid"><div class="vit"><label>時間<input type="time" name="${p}time" value="${h(d.time)}"></label>${num('temp', '體溫', '36.5', '0.1')}${num('pulse', '脈搏')}
         <label>血壓<span class="bp"><input type="number" inputmode="numeric" name="${p}sbp" value="${h(d.sbp)}" placeholder="收縮">/<input type="number" inputmode="numeric" name="${p}dbp" value="${h(d.dbp)}" placeholder="舒張"></span></label>
-        <label class="opt">複測血壓<input type="text" name="${p}bp2" value="${h(d.bp2)}" placeholder="例 11:50 106/58"></label>${num('weight', '體重', '每月', '0.1').replace('<label>', '<label class="opt">')}</div>
+        <label class="opt">複測血壓<input type="text" name="${p}bp2" value="${h(d.bp2)}" placeholder="例 11:50 106/58"></label></div>
+        ${(() => { const m = monthMeasure(c.id, day); return `<div class="monthly"><span class="small ${m ? 'ok-t' : 'warn-t'}">每月量測：${m ? `本月已量（${roc(m.date)}${[['weight', '體重'], ['mac', '臂'], ['cc', '小腿']].filter(([k]) => m.data[k]).map(([k, l]) => ' ' + l + h(m.data[k])).join('')}）` : '本月尚未量'}</span>
+          ${num('weight', '體重 kg', '每月', '0.1').replace('<label>', '<label class="opt">')}${num('mac', '臂中圍 cm', '無法量體重者', '0.1').replace('<label>', '<label class="opt">')}${num('cc', '小腿圍 cm', '無法量體重者', '0.1').replace('<label>', '<label class="opt">')}</div>`; })()}
         <div class="sels">${sels}</div><div class="dnote"><input type="text" name="${p}note" value="${h(d.note)}" placeholder="備註／異常（沒事不用填）" list="dailyTpl"></div></div></div>`; }).join('');
   return layout('DAILY', `<div class="pagehead"><div><h1>今日照顧紀錄</h1><div class="muted">生命徵象＋如廁＋照顧紀錄合併一頁；已依每位長輩「平常的狀況」帶好，只要改有變化的</div></div><span class="sp"></span>
     <div class="btns"><a class="btn" href="#/daily?date=${addDays(day, -1)}">◀ 前一天</a><input type="date" value="${day}" onchange="App.go('/daily?date='+this.value)"><a class="btn" href="#/daily?date=${addDays(day, 1)}">後一天 ▶</a></div></div>
     <div class="card fr" style="align-items:center"><div><b>${rocLong(day)}</b>　<span class="muted">在案 ${cs.length} 位・已儲存 ${saved} 位</span></div><span style="flex:1"></span>
-      <div class="btns"><label class="small"><input type="checkbox" id="onlyAlert" onchange="App.dailyFilter(this.checked)"> 只看異常／已修改</label><a class="btn sm" href="#/rec/DAILY">歷史紀錄</a></div></div>
+      <div class="btns"><label class="small"><input type="checkbox" id="onlyAlert" onchange="App.dailyFilter(this.checked)"> 只看異常／已修改</label>
+      <label class="small"><input type="checkbox" onchange="document.querySelectorAll('.daily').forEach(c => { c.style.display = this.checked && c.querySelector('.monthly .ok-t') ? 'none' : ''; })"> 只看本月未量測</label><a class="btn sm" href="#/rec/DAILY">歷史紀錄</a></div></div>
     <form id="df" onsubmit="return App.saveDaily(event,'${day}')">${cards}<datalist id="dailyTpl">${S.DAILY_NOTE_TPL.map(t => `<option>${t}</option>`).join('')}</datalist>
     <button class="fab-save" style="display:block" type="submit">💾 儲存全部</button><div class="btns" style="margin:16px 0 80px"><button class="btn pri">💾 儲存全部（${cs.length} 位）</button></div></form>`);
 };
@@ -858,7 +864,9 @@ function recFormBar(mod, c, day, isEdit, route) {
 }
 V.nutriForm = (id, q) => {
   const r = id ? DB.records.find(x => x.id === +id) : null; const cid = +(q.client || (r && r.client_id) || 0); const c = cid ? client(cid) : null;
-  let d = r ? r.data : {}; if (!r && c) { const last = recs('MNA', cid)[0]; if (last) ['height', 'texture', 'p_staple', 'p_protein', 'p_veg', 'water'].forEach(k => { if (last.data[k]) d[k] = last.data[k]; }); }
+  let d = r ? r.data : {}; let fromDaily = '';
+  if (!r && c) { const last = recs('MNA', cid)[0]; if (last) ['height', 'texture', 'p_staple', 'p_protein', 'p_veg', 'water'].forEach(k => { if (last.data[k]) d[k] = last.data[k]; });
+    ['weight', 'mac', 'cc'].forEach(k => { const x = recs('DAILY', cid).find(y => y.data[k] && y.date >= addMonths(todayISO(), -3)); if (x && !d[k]) { d[k] = x.data[k]; fromDaily = roc(x.date); } }); }
   const qq = ([k, t, o]) => `<div class="mna-q"><div><b>${k}.</b> ${h(t)}</div><div class="pills" style="margin-top:6px">${o === 'protein'
     ? S.PROTEIN.map(x => `<label class="pill"><input type="checkbox" name="K" value="${h(x)}" ${(d.K || []).includes(x) ? 'checked' : ''}><span>${h(x)}</span></label>`).join('')
     : o.map(([x, sc]) => `<label class="pill"><input type="radio" name="${k}" value="${h(x)}" ${d[k] === x ? 'checked' : ''}><span>${h(x)} <small>(${sc})</small></span></label>`).join('')}</div></div>`;
@@ -866,7 +874,7 @@ V.nutriForm = (id, q) => {
   return layout('MNA', `<div class="pagehead"><div><h1>營養評估（MNA）</h1><div class="muted">BMI、分數、營養師建議句都會自動算；選項與分數沿用中心 care99 的版本</div></div></div>
   <form id="f" data-kind="mna" onsubmit="return App.saveMNA(event,${id || 0})">${recFormBar('MNA', c, r ? r.date : todayISO(), !!r, '/nutri/new')}
   ${!c ? '<div class="card empty">請先選擇個案</div>' : `<div class="grid view-grid"><div>
-    <div class="card"><h2>身體測量</h2><div class="fr"><div><label class="f">身高 cm</label><input type="number" step="0.1" inputmode="decimal" name="height" value="${h(d.height)}"></div>
+    <div class="card"><h2>身體測量</h2>${fromDaily ? `<div class="src small">已帶入今日照顧紀錄（${fromDaily}）的每月量測</div>` : ''}<div class="fr"><div><label class="f">身高 cm</label><input type="number" step="0.1" inputmode="decimal" name="height" value="${h(d.height)}"></div>
       <div><label class="f">體重 kg</label><input type="number" step="0.1" inputmode="decimal" name="weight" value="${h(d.weight)}"></div><div><label class="f">BMI（自動）</label><input type="text" id="bmi" readonly style="width:150px;background:#f3f6f5"></div>
       <div><label class="f">臂中圍 MAC（cm）</label><input type="number" step="0.1" inputmode="decimal" name="mac" value="${h(d.mac)}" style="width:100px"><div class="small muted" id="macBand">≥22＝1分；21–21.9＝0.5分</div></div>
       <div><label class="f">小腿圍 CC（cm）</label><input type="number" step="0.1" inputmode="decimal" name="cc" value="${h(d.cc)}" style="width:100px"><div class="small muted" id="ccBand">≥31＝1分</div></div></div>
@@ -1176,7 +1184,7 @@ function indicatorRows() {
 
 /* ============================== 列印版面（預覽、PDF、Word 共用） ============================== */
 let PRINT_CSS = '';
-fetch('print.css?v=5').then(r => r.text()).then(t => { PRINT_CSS = t; }).catch(() => {});
+fetch('print.css?v=6').then(r => r.text()).then(t => { PRINT_CSS = t; }).catch(() => {});
 const o = (sel, opts) => opts.map(x => `<span class="o ${x === sel || (Array.isArray(sel) && sel.includes(x)) ? 'on' : ''}">${x === sel || (Array.isArray(sel) && sel.includes(x)) ? '☑' : '□'} ${h(x)}</span>`).join('');
 const boxes = t => h(t).replace(/☑([^　☐☑（\s]+)/g, '<b class="v o">☑$1</b>').replace(/☐([^　☐☑（\s<]+)/g, '<span class="o">☐$1</span>');
 const nl = t => h(t).replace(/\n/g, '<br>');

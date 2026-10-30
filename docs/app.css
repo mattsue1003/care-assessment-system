@@ -298,3 +298,6 @@ sup.new { font-size: 9px; color: var(--accent); margin-left: 2px; font-weight: 7
 .geno-row input[type=text] { padding: 4px 6px; min-height: 0; font-size: 14px; }
 .geno-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 900px) { .geno-grid { grid-template-columns: 1fr; } .geno-row input[type=text] { font-size: 16px; } }
+
+.daily .monthly { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: flex-end; padding: 4px 8px; border: 1px dashed #cfd8d4; border-radius: 8px; }
+.daily .monthly > span { width: 100%; } .ok-t { color: var(--ok); } .warn-t { color: var(--warn); font-weight: 700; }

@@ -14,7 +14,9 @@ DAILY_FIELDS = [
     ("sbp", "收縮壓", "num", None, "生命徵象"),
     ("dbp", "舒張壓", "num", None, "生命徵象"),
     ("bp2", "複測血壓", "text", None, "生命徵象"),
-    ("weight", "體重", "num", None, "生命徵象"),
+    ("weight", "體重", "num", None, "每月量測"),
+    ("mac", "臂中圍", "num", None, "每月量測"),   # 護理師 10/30 意見：無法量體重的長輩改量臂中圍、小腿圍（公分），每月一次
+    ("cc", "小腿圍", "num", None, "每月量測"),
     ("stool", "大便", "sel", ["無", "1次", "2次", "3次以上"], "如廁"),
     ("urine", "小便", "sel", ["無", "1次", "2次", "3次", "4次", "5次", "6次", "7次以上"], "如廁"),
     ("mental", "精神", "sel", ["好", "普通", "疲倦", "嗜睡"], "照顧"),
@@ -51,6 +53,11 @@ def daily_alerts(d):
         out.append("情緒" + d["mood"])
     if d.get("eat_amt") in ("吃完3分", "未進食"):
         out.append("進食" + d["eat_amt"])
+    m, c = num("mac"), num("cc")
+    if m is not None and m < 21:
+        out.append(f"臂中圍 {m:g} 偏低")
+    if c is not None and c < 31:
+        out.append(f"小腿圍 {c:g} 偏低")
     if d.get("stool") in ("3次以上",):
         out.append("大便 3 次以上")
     return out
@@ -366,6 +373,11 @@ def month_summary(daily, irs=(), pcs=(), weekdays=""):
         vit.append(f"脈搏 {p[0]:g}–{p[1]:g} 次/分")
     if vit:
         out.append("量測生命徵象" + "，".join(vit) + "。")
+    meas = [r for r in present if r.get("weight") or r.get("mac") or r.get("cc")]
+    if meas:
+        r = meas[-1]
+        parts = [f"{l} {r[k]} {u}" for k, l, u in (("weight", "體重", "kg"), ("mac", "臂中圍", "cm"), ("cc", "小腿圍", "cm")) if r.get(k)]
+        out.append("本月量測：" + "、".join(parts) + "。")
     alerts = sum(1 for r in present if daily_alerts(r))
     if alerts:
         out.append(f"本月有 {alerts} 天生命徵象或狀況異常，已通知護理師追蹤。")

@@ -954,7 +954,10 @@ def daily():
         ex = db().execute("SELECT * FROM records WHERE module='DAILY' AND client_id=? AND date=?", (c["id"], day)).fetchone()
         usual = usual_daily(c["id"])
         d = json.loads(ex["data"]) if ex else dict(usual)
-        rows.append({"c": c, "d": d, "usual": usual, "saved": bool(ex), "alerts": M.daily_alerts(d) if ex else []})
+        meas = db().execute("""SELECT * FROM records WHERE module='DAILY' AND client_id=? AND date LIKE ? AND
+            (data LIKE '%"weight"%' OR data LIKE '%"mac"%' OR data LIKE '%"cc"%') ORDER BY date DESC LIMIT 1""", (c["id"], day[:7] + "%")).fetchone()
+        rows.append({"c": c, "d": d, "usual": usual, "saved": bool(ex), "alerts": M.daily_alerts(d) if ex else [],
+                     "meas": rec_dict(meas) if meas else None})
     saved = sum(1 for r in rows if r["saved"])
     return render_template("daily.html", rows=rows, day=day, M=M, saved=saved,
                            prev=(to_date(day) - timedelta(days=1)).isoformat(), next=(to_date(day) + timedelta(days=1)).isoformat())
@@ -1022,6 +1025,13 @@ def nutri_form(rid=None):
         if last:
             ld = json.loads(last["data"])
             data = {k: ld[k] for k in ("height", "texture", "p_staple", "p_protein", "p_veg", "water") if ld.get(k)}
+        # 帶入今日照顧紀錄近 3 個月最新一次每月量測（體重／臂中圍／小腿圍）
+        for k in ("weight", "mac", "cc"):
+            row = db().execute(f"""SELECT date, data FROM records WHERE module='DAILY' AND client_id=? AND date>=? AND data LIKE '%"{k}"%'
+                ORDER BY date DESC LIMIT 1""", (cid, add_months(date.today(), -3).isoformat())).fetchone()
+            if row and not data.get(k):
+                data[k] = json.loads(row["data"]).get(k)
+                data.setdefault("_from_daily", roc(row["date"]))
     return render_template("nutri_form.html", r=r, c=c, data=data, M=M, cs=cs_with(c),
                            day=r["date"] if r else date.today().isoformat())
 
